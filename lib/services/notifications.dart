@@ -760,30 +760,43 @@ class NotifService {
     final now = DateTime.now();
     final diff = due.difference(now);
     if (diff.isNegative) return;
+
     final fmt = intl.DateFormat('h:mm a');
     final fmtD = intl.DateFormat('MMM d');
 
-    final dayBefore = due.subtract(const Duration(days: 1));
-    await schedule(
-      id: id + 200000,
-      title: '📋 Due tomorrow',
-      body: '$title — Tomorrow at ${fmt.format(due)}',
-      when: DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 21, 0),
-    );
-    await schedule(
-      id: id,
-      title: '⏰ Due in 24 hours',
-      body: '$title — ${fmtD.format(due)} at ${fmt.format(due)}',
-      when: due.subtract(const Duration(hours: 24)),
-    );
-    await schedule(
-      id: id + 100000,
-      title: '🔥 Due in 3 hours!',
-      body: '$title — Today at ${fmt.format(due)}',
-      when: due.subtract(const Duration(hours: 3)),
-    );
+    if (diff.inDays <= 7) {
+      final threeHourMark = due.subtract(const Duration(hours: 3));
+      if (threeHourMark.isAfter(now)) {
+        await schedule(
+          id: id + 100000,
+          title: '🔥 Due in 3 hours!',
+          body: '$title — Today at ${fmt.format(due)}',
+          when: threeHourMark,
+        );
+      }
+      final oneDayMark = due.subtract(const Duration(hours: 24));
+      if (oneDayMark.isAfter(now)) {
+        await schedule(
+          id: id,
+          title: '⏰ Due in 24 hours',
+          body: '$title — ${fmtD.format(due)} at ${fmt.format(due)}',
+          when: oneDayMark,
+        );
+      }
+      final dayBefore = due.subtract(const Duration(days: 1));
+      final nightBefore = DateTime(
+          dayBefore.year, dayBefore.month, dayBefore.day, 21, 0);
+      if (nightBefore.isAfter(now)) {
+        await schedule(
+          id: id + 200000,
+          title: '📋 Due tomorrow',
+          body: '$title — Tomorrow at ${fmt.format(due)}',
+          when: nightBefore,
+        );
+      }
+    }
 
-    if (diff.inHours < 3 && !diff.isNegative) {
+    if (diff.inHours < 3) {
       startUrgentTaskReminder(id, title);
     }
   }
@@ -844,38 +857,38 @@ class NotifService {
     );
   }
 
-  // ── Daily Morning (Spaced Repetition) Notifications ──────────────────────
-  static Future<void> scheduleDailyMorningNotifs(
-      List<StudyTopic> topics,
-      List<Subject> subjects,
-      ) async {
-    for (int i = 0; i < 7; i++) {
-      final date = DateTime.now().add(Duration(days: i));
-      final targetDate = DateTime(date.year, date.month, date.day);
-
-      final dueTopics = topics.where((t) {
-        final r = t.nextReview;
-        if (r == null) return false;
-        final rd = DateTime(r.year, r.month, r.day);
-        return rd.isAtSameMomentAs(targetDate);
-      }).toList();
-
-      if (dueTopics.isNotEmpty) {
-        final when = DateTime(date.year, date.month, date.day, 8, 0);
-        if (when.isBefore(DateTime.now())) continue;
-        await schedule(
-          id: 1000000 + i,
-          title: '🧠 Study Time!',
-          body: 'You have ${dueTopics.length} topics due for Spaced Repetition today.',
-          when: when,
-          channelId: 'study_notifs',
-          channelName: 'Study Reminders',
-        );
-      } else {
-        await cancelSingle(1000000 + i);
-      }
-    }
-  }
+  // // ── Daily Morning (Spaced Repetition) Notifications ──────────────────────
+  // static Future<void> scheduleDailyMorningNotifs(
+  //     List<StudyTopic> topics,
+  //     List<Subject> subjects,
+  //     ) async {
+  //   for (int i = 0; i < 7; i++) {
+  //     final date = DateTime.now().add(Duration(days: i));
+  //     final targetDate = DateTime(date.year, date.month, date.day);
+  //
+  //     final dueTopics = topics.where((t) {
+  //       final r = t.nextReview;
+  //       if (r == null) return false;
+  //       final rd = DateTime(r.year, r.month, r.day);
+  //       return rd.isAtSameMomentAs(targetDate);
+  //     }).toList();
+  //
+  //     if (dueTopics.isNotEmpty) {
+  //       final when = DateTime(date.year, date.month, date.day, 8, 0);
+  //       if (when.isBefore(DateTime.now())) continue;
+  //       await schedule(
+  //         id: 1000000 + i,
+  //         title: '🧠 Study Time!',
+  //         body: 'You have ${dueTopics.length} topics due for Spaced Repetition today.',
+  //         when: when,
+  //         channelId: 'study_notifs',
+  //         channelName: 'Study Reminders',
+  //       );
+  //     } else {
+  //       await cancelSingle(1000000 + i);
+  //     }
+  //   }
+  // }
 
   // ════════════════════════════════════════════════════════════════════════════
   // TIMETABLE NOTIFICATIONS — FIXED
@@ -903,6 +916,15 @@ class NotifService {
     required List<TaskModel> tasks,
   }) async {
     await cancelTimetableAll();
+    try {
+      final pending = await _p.pendingNotificationRequests();
+      final slotsAvailable = 50 - pending.length;
+      if (slotsAvailable <= 8) {
+        debugPrint('⚠️ [QUOTA] Only $slotsAvailable slots free — timetable scheduling skipped');
+        return;
+      }
+    } catch (_) {}
+
     // ── Diagnostic snapshot of what we're about to schedule ──────────────────
     await NotifDiag.log('TTSCHED',
         'scheduleTimetableNotifs called: ${entries.length} entries, '
@@ -1027,7 +1049,7 @@ class NotifService {
         int found = 0;
         DateTime candidate = _nextWeekdayAt(now, e.dayOfWeek, h, m);
 
-        while (found < 4) {
+        while (found < 2) {
           final wNum = _weekNumber(candidate);
           final wType = wNum.isOdd ? 'odd' : 'even';
 
@@ -1118,36 +1140,20 @@ class NotifService {
   //   2. Full pending-queue sweep: cancel any remaining timetable payload
   //      regardless of ID, catching orphans from previous sessions.
   static Future<void> cancelTimetableAll() async {
-    // 1) Cancel tracked IDs
     final idsCopy = List<int>.from(_timetableNotifIds);
     _timetableNotifIds.clear();
     for (final id in idsCopy) {
-      try {
-        await _p.cancel(id);
-      } catch (_) {}
+      try { await _p.cancel(id); } catch (_) {}
     }
-
-    // 2) Full sweep by payload — catches orphans from previous sessions
-    //    regardless of ID value (fixes the "installed fresh / empty Set" case)
     try {
       final pending = await _p.pendingNotificationRequests();
-      int swept = 0;
-      for (final req in pending) {
-        final isTimetableById = req.id >= 900000 && req.id <= 935000;
-        final isTimetableByPayload =
-            req.payload != null && req.payload!.startsWith('timetable:');
-        if (isTimetableById || isTimetableByPayload) {
-          try {
-            await _p.cancel(req.id);
-            swept++;
-          } catch (_) {}
+      for (final notif in pending) {
+        final isTimetableRange = notif.id >= 900000 && notif.id <= 990000;
+        final hasTimetablePayload =
+            notif.payload != null && notif.payload!.startsWith('timetable:');
+        if (isTimetableRange || hasTimetablePayload) {
+          try { await _p.cancel(notif.id); } catch (_) {}
         }
-      }
-      if (swept > 0) {
-        NotifDiag.logSync(
-          'CANCEL',
-          'cancelTimetableAll: swept $swept orphaned timetable notifs from queue',
-        );
       }
     } catch (_) {}
   }
@@ -1159,9 +1165,8 @@ class NotifService {
     final when = r.dateTime;
     if (when == null || when.isBefore(DateTime.now())) return;
 
-    final base = 980000 + r.id!;
     await schedule(
-      id: base,
+      id: 980000 + r.id!,
       title: '🔔 Reminder',
       body: r.text,
       when: when,
@@ -1170,19 +1175,6 @@ class NotifService {
       channelDesc: 'Custom reminders',
       payload: 'reminder:${r.id}',
     );
-    final early = when.subtract(const Duration(minutes: 15));
-    if (early.isAfter(DateTime.now())) {
-      await schedule(
-        id: base + 1,
-        title: '⏰ Reminder in 15 min',
-        body: r.text,
-        when: early,
-        channelId: 'reminder_notifs',
-        channelName: 'Reminders',
-        channelDesc: 'Custom reminders',
-        payload: 'reminder:${r.id}',
-      );
-    }
   }
 
   static Future<void> rescheduleAllReminders(
@@ -1344,53 +1336,53 @@ class NotifService {
     } catch (_) {}
   }
 
-  // ── NOVA: Schedule daily check-in notifications ───────────────────────────
-  static Future<void> scheduleNovaCheckIns(List<TimeOfDay> times) async {
-    _ensureTimezone();
-    for (int i = 1; i <= 3; i++) {
-      try {
-        await _p.cancel(860000 + i);
-      } catch (_) {}
-    }
-    for (int i = 0; i < times.length && i < 3; i++) {
-      final t = times[i];
-      final now = DateTime.now();
-      var next = DateTime(now.year, now.month, now.day, t.hour, t.minute);
-      if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
-      try {
-        await _p.zonedSchedule(
-          860001 + i,
-          '🧠 NOVA Briefing',
-          'Your scheduled intelligence brief is ready. Tap to open.',
-          tz.TZDateTime.from(next, tz.local),
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'nova_checkin',
-              'NOVA Daily Check-ins',
-              channelDescription: 'Scheduled NOVA briefing notifications',
-              importance: Importance.high,
-              priority: Priority.high,
-            ),
-            iOS: const DarwinNotificationDetails(
-              presentAlert: true,
-              presentSound: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-          payload: 'nova_brief_checkin',
-        );
-      } catch (e) {
-        NotifDiag.logSync(
-          'NOVA',
-          'scheduleNovaCheckIn[$i] error: $e',
-          isError: true,
-        );
-      }
-    }
-  }
+  // // ── NOVA: Schedule daily check-in notifications ───────────────────────────
+  // static Future<void> scheduleNovaCheckIns(List<TimeOfDay> times) async {
+  //   _ensureTimezone();
+  //   for (int i = 1; i <= 3; i++) {
+  //     try {
+  //       await _p.cancel(860000 + i);
+  //     } catch (_) {}
+  //   }
+  //   for (int i = 0; i < times.length && i < 3; i++) {
+  //     final t = times[i];
+  //     final now = DateTime.now();
+  //     var next = DateTime(now.year, now.month, now.day, t.hour, t.minute);
+  //     if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
+  //     try {
+  //       await _p.zonedSchedule(
+  //         860001 + i,
+  //         '🧠 NOVA Briefing',
+  //         'Your scheduled intelligence brief is ready. Tap to open.',
+  //         tz.TZDateTime.from(next, tz.local),
+  //         NotificationDetails(
+  //           android: AndroidNotificationDetails(
+  //             'nova_checkin',
+  //             'NOVA Daily Check-ins',
+  //             channelDescription: 'Scheduled NOVA briefing notifications',
+  //             importance: Importance.high,
+  //             priority: Priority.high,
+  //           ),
+  //           iOS: const DarwinNotificationDetails(
+  //             presentAlert: true,
+  //             presentSound: true,
+  //           ),
+  //         ),
+  //         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  //         uiLocalNotificationDateInterpretation:
+  //         UILocalNotificationDateInterpretation.absoluteTime,
+  //         matchDateTimeComponents: DateTimeComponents.time,
+  //         payload: 'nova_brief_checkin',
+  //       );
+  //     } catch (e) {
+  //       NotifDiag.logSync(
+  //         'NOVA',
+  //         'scheduleNovaCheckIn[$i] error: $e',
+  //         isError: true,
+  //       );
+  //     }
+  //   }
+  // }
 
   // ── NOVA: Mandatory attendance alert ─────────────────────────────────────
   static Future<void> showMandatoryAttendanceAlert({
@@ -1470,12 +1462,7 @@ class NotifService {
   }
 
   static Future<void> cancelReminder(int rid) async {
-    try {
-      await _p.cancel(980000 + rid);
-    } catch (_) {}
-    try {
-      await _p.cancel(980000 + rid + 1);
-    } catch (_) {}
+    try { await _p.cancel(980000 + rid); } catch (_) {}
   }
 
   // ════════════════════════════════════════════════════════════════════════════

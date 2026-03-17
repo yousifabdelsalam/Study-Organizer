@@ -3194,8 +3194,25 @@ class _CampusPageState extends State<CampusPage>
                   final res = await FilePicker.platform.pickFiles(
                     type: FileType.any,
                   );
-                  if (res != null && res.files.single.path != null)
-                    ctx.read<AppBloc>().add(ImportData(res.files.single.path!));
+                  if (res == null || res.files.single.path == null) return;
+
+                  ctx.read<AppBloc>().add(ImportData(res.files.single.path!));
+
+                  await Future.delayed(const Duration(seconds: 2));
+                  if (!mounted) return;
+
+                  final newState = context.read<AppBloc>().state;
+                  _rescheduleNotificationsOnStart(newState);
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Data imported & notifications rescheduled'),
+                        backgroundColor: Color(0xFF2ED573),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
                 },
                 icon: const Icon(Icons.download),
                 label: const Text("Import"),

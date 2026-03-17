@@ -159,12 +159,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     // ═══ KEY: Schedule timer AFTER state has data ═══
     _scheduleNextTimetableUpdate();
 
-    // Schedule morning spaced repetition notifications
-    try {
-      await NotifService.scheduleDailyMorningNotifs(tp, s);
-    } catch (e) {
-      debugPrint('Failed to schedule morning notifs: $e');
-    }
+
 
     // ═══ CRITICAL: Reschedule everything after import/reload ═══
     final subjectNames = <int, String>{};

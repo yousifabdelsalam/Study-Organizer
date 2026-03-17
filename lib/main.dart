@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:study_organizer/services/midnight_scheduler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:sqflite/sqflite.dart';
@@ -77,7 +78,7 @@ void main() async {
 
   // Initialize notification service — registers the background handler
   await NotifService.init();
-  await NotifService.init();
+  await MidnightScheduler.init();
   await NotifDiag.init(); // ← add this
   // ── Single WorkManager initialization for ALL background tasks ──
   // Both watchdog and intelligence engine use this shared dispatcher.
