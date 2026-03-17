@@ -1,0 +1,447 @@
+🚀 Futuristic Feature Ideas for JARVIS
+Here's what would make this feel like a real Iron Man system, not just another study app:
+
+1. 🧠 JARVIS MEMORY GRAPH
+"The Knowledge Web"
+An interactive node graph that visualizes how all your topics connect. Each subject is a cluster of nodes — when you study a topic, JARVIS draws edges to related topics in other subjects (e.g., Calculus connects to Physics, Signals). Nodes glow brighter as mastery increases, dim as they approach review time. Tap a node to go directly to that topic. Built with CustomPaint + touch gestures.
+Why it's powerful: You literally see your knowledge as a living neural network. Gaps appear as isolated dark nodes.
+
+2. 🎙️ VOICE-ACTIVATED JARVIS
+"Hey JARVIS, what do I have tomorrow?"
+Wake word detection using the mic — when you say "Hey JARVIS", the AI overlay opens and listens. You can say "Add a task: Digital Design assignment due Thursday", "What's my weakest topic in Signals?", or "Start a 45-minute focus session". Uses record (already in pubspec) + Gemini for NLP interpretation.
+Why it's powerful: Hands-free while studying. Feels genuinely like the Iron Man suit.
+
+3. 📡 REAL-TIME EXAM COUNTDOWN HUD
+"The War Room"
+A dedicated full-screen widget that shows all your upcoming exams as a mission timeline — like a military ops board. Each exam has a live countdown in days:hours:minutes, a readiness score (calculated from topic mastery % + marks so far), and a color status: 🟢 Ready / 🟡 At Risk / 🔴 Critical. The readiness score updates live as you mark topics as studied.
+Why it's powerful: Constant pressure + awareness. You always know exactly how prepared you are for each battle.
+
+4. 🔮 JARVIS DREAM ANALYZER
+"What will tomorrow's exam look like?"
+The night before any exam, JARVIS sends a notification: "Exam tomorrow. Running final prediction..." It pulls all your data — docs, past exams, marks, what you studied today — and generates a final "Tonight's Brief": the top 3 most likely questions, the one topic you're weakest on, and a 15-minute crash review plan. Auto-triggered, no interaction needed.
+Why it's powerful: Feels like having a personal military briefing before a mission.
+
+5. 📊 NEURAL PROGRESS HEATMAP
+"Your Study DNA"
+A GitHub-style contribution heatmap but for studying — every day you study a topic, complete a task, or run a focus session, that day glows. Rows = subjects, columns = days of semester. Hover/tap a cell to see exactly what you did that day. Also shows "study streaks" with fire animations.
+Why it's powerful: Visual proof of effort. The shame of seeing empty cells is more motivating than any reminder.
+
+6. 🤝 BATTLE MODE — Study with AI Opponent
+"Defeat JARVIS in a quiz"
+Instead of a regular quiz, JARVIS challenges YOU. It picks a topic, asks you a question, you answer. Then JARVIS gives its answer with explanation. You vote who answered better. The AI adapts difficulty based on your performance — if you're crushing it, JARVIS increases the difficulty and says "Impressive. Let's try something harder." Tracks your win rate against JARVIS per subject.
+Why it's powerful: Gamification + ego. Nobody wants to lose to their own AI.
+
+7. 🛰️ SEMESTER MISSION CONTROL
+"The Full Ops View"
+Replace the plain dashboard with a full mission-control aesthetic — each subject is a "mission" with status indicators, resource allocation (how many docs fed to JARVIS), threat level (upcoming deadlines), and a health bar (your current marks %). All animated. Tap any mission to deploy to that subject's detail page.
+Why it's powerful: Reframes studying as strategic operations, not tedious work.
+
+8. 📱 JARVIS LOCK SCREEN WIDGET
+"Always-on Intel"
+A home screen / lock screen widget showing today's schedule, next deadline countdown, and JARVIS's daily tip pulled the night before. Uses Flutter's home_widget package. Updates every hour automatically.
+Why it's powerful: JARVIS follows you outside the app — the system feels alive.
+
+9. 🧬 TOPIC DNA DECAY SIMULATION
+Enhanced Spaced Repetition Visualization
+Instead of just "stage 1-5", show topic memory as a decaying DNA helix that degrades in real-time. The helix strands visually break apart as the review date approaches, and regenerate when you study. Topics at 0% memory glow red and "flatline" with a heartbeat animation. JARVIS sends alerts: "Warning: 3 topics are approaching critical memory decay."
+Why it's powerful: Makes forgetting feel urgent and visible instead of abstract.
+
+10. 🎯 JARVIS DEAL BREAKER DETECTOR
+"Your real weaknesses, exposed"
+JARVIS cross-references your marks, topic mastery, and past exam patterns to identify the specific subtopics that have historically cost you the most points — not just "you're weak in Chapter 3" but "You consistently lose 8 marks on Karnaugh map minimization for 4-variable functions. Here's why, and here's a drill." One button generates a targeted micro-drill for exactly that weakness.
+Why it's powerful: Precision training instead of generic studying. This is what separates an 80% student from a 95% student.
+
+The top 3 I'd implement first based on impact vs effort:
+
+Voice-activated JARVIS — record is already installed, just needs Gemini NLP routing
+Real-time Exam Countdown War Room — pure UI, no new backend, extremely high daily-use value
+Deal Breaker Detector — leverages your existing marks + docs data, one new Gemini call, immediately actionable
+
+Which of these excites you most? I can build any of them.i want the reactor core pomodor: (below is a suggested way to do this , suggested by ai model)
+Part 1: How to Architect This in Flutter
+To build this "Cognitive Reactor," you need four specific technical components:
+
+1. The "Cognitive Breach" Detector (App Lifecycle)
+You need to detect when thepastedi uploaded you the code zip and a concept design also if you neededFeb 21Let me read the existing campus.dart Focus tab and the full codebase structure first.Viewed 3 files, ran a commandViewed 3 files, ran a commandExtract uploaded libScriptRead the existing cognitive_reactor_page.dart to understand what's already thereRead the truncated middle section of cognitive_reactor_page.dartRead the missing section 478-531DoneNow I have the complete picture. The existing code is functional but basic — purple theme, simple rods, basic steam. I need to massively upgrade it to match the cinematic concept image: metallic/rusty industrial aesthetic, neon green/cyan glow, authentic reactor core with proper depth, better rod animation, richer particles, and a more dramatic HUD. Let me build it:Ran 2 commands, created a fileRan 2 commands, created a fileBackup originalScriptComplete rewrite of cognitive_reactor_page.dart with cinematic Chernobyl-themed reactorcognitive_reactor_page.dartVerify the complete file structureScriptDoneAll 18 checks pass, braces perfectly balanced. Let me present it:Presented filePresented filePresented fileDoneComplete rewrite — here's everything that changed and why:
+
+Visual Upgrades (matching your concept art):
+
+_RustyRing — the outer housing is now a SweepGradient of dark/light metallic greys with a custom _BoltPainter that draws 16 physical rivets/bolts around the ring, exactly like the industrial look in the image
+_ReactorWell — 3-layer deep core: black void → Cerenkov water glow (expands as rods lower) → bright inner plasma spot. The glow radius and opacity are all driven by progress so it literally brightens as you focus more
+_ControlRod — 12 rods (vs 8 before) arranged in 2 rings (outer 6 + inner 6) with a metallic kRodSteel/kRodTip gradient and a glowing hot tip that intensifies as rods lower
+_TopCollar — the cylindrical cap mechanism at the top with slot channels, matching the mechanical structure in the image
+_ScanRingPainter — a rotating cyan/green arc sweeps around the outer ring while the reactor is active, giving it that active-system feel
+kDigitGreen — the clock now uses matrix-green (#00FF41) on a near-black background to match the digital display in the concept image
+
+Architecture improvements:
+
+Rod movement is now a proper AnimationController + Tween (_rodAnim) that smoothly interpolates — when a breach hits, the rods snap back up with animation instead of teleporting
+_steamCtrl, _pulseCtrl, _glowCtrl all run independently so glow pulsing and steam aren't locked to the same beat
+_ReactorCore is a proper stateless widget that rebuilds only from AnimatedBuilder — no unnecessary full-tree rebuilds each second
+The bottom HUD row shows Cycle, Sessions, Status and Tier (Standard/Enhanced/Coolant+) all in one compact industrial bar
+
+Tier system (Teraflops):
+
+0–199 TF → Standard (green)
+200–499 TF → Enhanced (green, brighter)
+500+ TF → Coolant Upgrade (everything shifts to kNeonCyan)
+Cognitive reactor pageCode · DART Download2 / 2lib.zipzipi uploaded you a full project of my flutter app, understand it , to be able to help me in whats coming:
+i want you to give me a hyper creative ideas and features to add to the app, with each one with case scenario usage, i want to feel like wooooooow9:56 PMLet me read everything thoroughly before suggesting anything.Ran 6 commandsRan 6 commandsExtract and list all dart filesScriptRead all models and app stateScriptRead dashboard, campus tabs overview, main shell navigationScriptGet size and key methods of major filesScriptUnderstand JARVIS features, packages available, and overlay structureScriptCheck imports/packages and remaining modelsScriptDoneNow I have a deep, complete understanding of the entire app. Let me write the ideas:Creative feature ideas documentCreative feature ideas documentCreative feature ideas documentideas.mdDoneHere are the ideas — built specifically around your exact data models, existing infrastructure, and what's already wired in:
+
+🔥 1. JARVIS DEATHCLOCK
+"The exam that will make or break your GPA — countdown to impact"
+A full-screen cinematic countdown page that pulls your lowest-scoring subject (from MarkModel), cross-references it with your next exam in the timetable, and displays a real-time countdown in days/hours/minutes/seconds — styled like a missile launch terminal. The number pulses red as it gets closer. Below the clock: your current readiness score (calculated live from StudyTopic.stage averages), and a single button: "DEPLOY JARVIS." Tap it and the AI Enigma Breakdown fires instantly.
+Scenario: Youssef has a Digital Design final in 6 days. He opens the app, and instead of the normal dashboard he sees a glowing red terminal: ⚠ CRITICAL THREAT: DIGITAL DESIGN — 138:42:17. His stomach drops. He taps Deploy JARVIS and gets his surgical battle plan in 40 seconds. He doesn't waste a single day.
+
+🧠 2. NEURAL WEB — Live Knowledge Graph
+"Watch your brain grow in real time"
+A full-screen interactive node graph where every StudyTopic is a glowing node. Nodes are connected by edges when they belong to the same subject. Node size = mastery stage (stage 0 is tiny and dim, stage 5 is large and bright white). Nodes that are overdue for review pulse red and slowly shrink. Tap any node → go directly to that topic's detail. The graph literally looks like a neural network — your knowledge, visualized. Built with CustomPaint + touch gesture detection.
+Scenario: She opens Neural Web after a week of intense studying. She sees 14 bright nodes in the Circuits cluster — and 3 dark, pulsing red ones she forgot to review. She taps the biggest red one — "Thevenin's Theorem" — and reviews it right there. The node lights up and grows. She feels the satisfaction of literally watching her brain get stronger.
+
+📸 3. LECTURE SNAPSHOT INTELLIGENCE
+"Point your camera at the board. JARVIS reads it."
+In subject detail's JARVIS tab, add a camera button. You take a photo of the whiteboard/slides during a lecture. JARVIS uses Gemini Vision (analyzeFileDirectly already handles file uploads + vision) to extract all text, identify the topic, auto-create a StudyTopic for anything new, and add a timestamped note to the subject. It even flags "this looks like an exam-likely formula" vs "context example."
+Scenario: During a Digital Logic lecture, the doctor writes a complex K-map minimization example. Youssef doesn't have time to copy it. He opens the app, taps 📸 in the JARVIS tab, and snaps the board. 8 seconds later JARVIS has extracted everything, created a topic "K-map 4-variable minimization", tagged it as exam-likely, and saved the formula in notes. He goes back to listening. The doctor never noticed.
+
+🎙️ 4. EXAM DEBRIEF — Voice-to-Memory
+"You just walked out of an exam. Talk to JARVIS about it."
+Right after your exam entry in the timetable passes, JARVIS sends a notification: "How did it go? Tap to debrief." Opens a voice recording session (microphone already set up via record package + Groq Whisper). You talk for 60 seconds: "The MCQs were all about Hamming codes, there were 2 questions on synchronous counters, and I blanked on the parity question." JARVIS transcribes it, extracts which topics appeared, updates those topics' metadata as "confirmed exam material", and stores a debrief note. Next time you prep for the same doctor's exam, JARVIS uses this debrief as primary intelligence.
+Scenario: He walks out of his midterm, opens the app. Notification is already waiting: "Debrief your Electronics midterm." He records 90 seconds while walking back from the exam hall. JARVIS updates 4 topics as confirmed exam material and notes that "the doctor loves numerical problems over theory." His future exam prep is now 40% more accurate — because he fed the machine real intel.
+
+⚔️ 5. SUBJECT DUEL MODE
+"You vs. your own AI. One topic. Fight."
+A gamified one-on-one quiz interface: JARVIS picks your weakest topic (lowest stage from StudyTopic) in a subject and asks you ONE brutal question based on the uploaded documents. You have 60 seconds to answer by voice or text. JARVIS grades your answer out of 10, gives a specific breakdown of what you got right/wrong, and either advances your topic stage or drops it. The UI is an arena — your health bar on the left, JARVIS's on the right. Lose 3 topics in a row and JARVIS says "You're not ready for this exam."
+Scenario: The day before a quiz, she opens Duel Mode for Mechanics. JARVIS picks "Free Body Diagrams — Friction Force" (stage 1, overdue). Asks: "A 20kg block on a 30° incline with μ=0.4. Find acceleration." She answers by voice. JARVIS gives her 6/10: she got the formula right but forgot to check if the block was moving. Topic stays at stage 1. She immediately understands what she needs to fix. She runs 4 more duels. Goes to the quiz confident.
+
+🌡️ 6. STRESS FORECAST ENGINE
+"JARVIS predicts your danger week before it happens"
+Every Sunday, JARVIS automatically cross-references your timetable, all task due dates, exam schedule, and topic review backlogs — and generates a "Week Stress Forecast" visualized as a weather-style heatmap. Red days = danger zone (exam + 3 tasks + 5 overdue topics). Green days = clear. Yellow = manageable. Automatically suggests: "Move the report deadline to Tuesday — Thursday is going to destroy you." Pushed as a morning notification every Sunday.
+Scenario: Sunday morning he opens the app. The Stress Forecast for next week shows Monday-Wednesday as green, then Thursday is flaming red: midterm + lab report due + 8 overdue topics. JARVIS already drafted a rebalancing plan: study 2 topics tonight, 3 Monday, finish the report Tuesday afternoon. He follows the plan. Thursday arrives and for the first time in 3 years, he doesn't feel blindsided.
+
+🗺️ 7. SEMESTER WAR MAP
+"Your entire semester as a military campaign"
+Replace the plain dashboard with a timeline visualization of the full semester — rendered as a battle map. Each week is terrain. Exams are fortresses. Completed tasks are captured territories (colored). Upcoming deadlines are enemy positions with countdowns. Your current position on the timeline moves in real time. The further right you are, the closer to the final. Uses CustomPaint for the terrain + existing SemesterModel + all task/exam data.
+Scenario: She opens the app in week 8 of 15. The War Map shows she's past the midpoint of the campaign. She can see the Final Exam fortress looming at week 15, still far — but she can also see 3 task "enemy positions" converging on week 10. She taps one to see the details. She's been visualizing the semester as a war she's winning. She finishes with her best GPA ever.
+
+💀 8. NIGHT BEFORE PROTOCOL
+"One notification. Everything you need for tomorrow's exam."
+The night before any exam (auto-detected from timetable + tasks), at exactly 10 PM JARVIS pushes a special notification. Open it → a full-screen "night before briefing": top 5 predicted topics (from Enigma analysis if run, otherwise from topic mastery data), the 3 things most likely to cost you marks, a 90-minute study plan broken into focused blocks, and a single checkbox: "I'm ready." Check it and JARVIS wishes you luck and tells you to sleep.
+Scenario: 10 PM the night before his Digital Design final. Notification arrives: "NIGHT BEFORE PROTOCOL — DD Final." He opens it. JARVIS gives him: study K-maps for 30 min, review flip-flop timing diagrams for 25 min, skim sequential circuit examples for 20 min, then sleep. It says: "You've mastered 11/14 topics. The 3 gaps are your only risk." He follows the plan. Sleeps at midnight. Wakes up calm.
+
+🔮 9. MARK ORACLE
+"What grade will you actually finish with?"
+In the Marks page, a new "Oracle" section: JARVIS takes all your current MarkModel data (what you've scored so far), the semester's weight distribution, and predicts your final grade with a confidence range. Shows: "Based on current trajectory: 78-84%. To reach 90%: you need 85%+ on the final." Updates live as you add marks. Shows a target bar you can drag — drag to 90% and it tells you exactly what scores you need in remaining assessments.
+Scenario: Week 11. She inputs her last midterm score: 72/100. The Oracle updates: "Projected final grade: 71-76%. To reach 80%: you need 88% on the final and full marks on the remaining quizzes." She sees exactly what the mountain looks like. She stops guessing and starts calculating. She knows exactly what she needs. She gets 89 on the final.
+
+🎭 10. JARVIS PERSONA FORGE
+"Your AI isn't a tool. It's a character you build."
+Instead of a generic AI assistant, let the user unlock and choose JARVIS personality modes based on Teraflops earned in the Cognitive Reactor. Modes include: Drill Sergeant (brutal, no mercy, pushes you hard), Mentor (patient, Socratic, explains everything), Rival (competitive, always challenges you to do better), Oracle (mystical, speaks in predictions and metaphors). Each mode changes how JARVIS phrases responses, what warnings it gives, how it rates your performance. The personality is injected into every Gemini system prompt.
+Scenario: He just hit 500 TF in the Cognitive Reactor and unlocked the Rival persona. He opens JARVIS and asks for a study plan. Instead of "Here's what I recommend...", JARVIS responds: "I ran the numbers. You're behind Ahmed in 3 topics. He's going to outscore you on Thursday if you keep this pace. Want to change that?" He laughs, closes the app, and studies for 3 hours straight. He didn't know he needed a rival.
+
+The ones I'd build first based on your existing infrastructure:
+#FeatureWhy easy to build3Lecture SnapshotanalyzeFileDirectly + camera picker already exist6Stress ForecastAll data already in state — pure logic + UI8Night Before ProtocolNotifService already scheduled, just needs Gemini call9Mark OraclePure math on existing MarkModel data4Exam Debriefrecord + Groq Whisper already wired, just needs new flowmore creative , i want ideas that smart and makes me a full mark student10:20 PMLet me dig deeper into the academic intelligence patterns in your app.Ran 2 commandsRan 2 commandsRead the AI brain methods to understand what intelligence is already builtScriptRead the full RPG tab to understand XP systemScriptDoneLet me read the parts I haven't seen yet — the subject detail page and the actual exam prep intelligence.Ran 3 commandsRan 3 commandsRead subject detail page structureScriptRead marks tab and JARVIS tab structure plus exam prep AIScriptRead the marks tab in detailScriptDoneNow I know exactly what the app can and cannot do. Here are ideas built from genuine understanding of your architecture — not generic features, but surgical tools designed to get you full marks:
+
+💉 1. THE MARK SURGEON
+"Every lost point has a name. Find it. Kill it."
+Right now your MarkModel stores obtained/total per category. The Mark Surgeon goes deeper: after entering any mark below 100%, JARVIS asks "What exactly did you lose marks on?" — you voice-memo or type it in 30 seconds. It stores these as "loss reasons" attached to each mark. Over the semester, it runs a cross-subject pattern analysis: "You've lost 47 marks total. 31 of them (66%) came from the same root cause: you write correct answers but skip showing intermediate steps. No other issue has cost you more." One problem. One fix. Full marks.
+Scenario: It's week 8. He checks Mark Surgeon. The AI tells him: across 4 subjects and 11 assessments, he loses marks in exactly 2 patterns — skipping formula derivation, and misreading "find the equivalent" as a single-step question. He fixes those 2 habits in the next 2 weeks. He gains 8+ marks he was leaving on the table for free.
+
+🔬 2. ANSWER AUTOPSY
+"Why did the doctor give you 7/10? Let JARVIS dissect it."
+You photograph your returned exam paper (camera → Gemini Vision). JARVIS reads your actual handwritten answers AND the doctor's red corrections/marks. It generates a forensic breakdown: what you wrote, what the doctor wanted, why you lost each mark, and what the model answer should have been. It then flags which StudyTopic each lost mark maps to and drops those topics straight back to stage 1 for re-review.
+Scenario: Midterm returned. She got 73/100. She photographs all 5 pages. JARVIS reads the red ink: she lost 12 marks on Q3 because she used mesh analysis where the doctor specifically wanted nodal analysis (it was in the instructions). She lost 8 marks on Q5 because she forgot to include the sign convention for current direction. Both are fixable habits, not knowledge gaps. She fixes them. Final exam: 94/100.
+
+🎯 3. THE FULL MARKS FORMULA
+"Reverse-engineer exactly what a perfect answer looks like for THIS doctor."
+You feed JARVIS a returned exam where you got a high-scoring question (e.g., 10/10). It analyzes what you wrote and extracts the doctor's implicit rubric: structure, terminology used, level of derivation shown, whether you cited theorems by name. It builds a personal "Full Marks Template" for each subject — a checklist you run before finishing each exam question. "For Dr. Hassan: always state Kirchhoff's laws before applying them. Always box the final answer. Use SI units explicitly."
+Scenario: She realizes Dr. Ahmed always gives full marks when she names the theorem, states the assumptions, solves, then verifies. She never verified before. Now she does it on every question. Every question. She goes from losing 3-5 marks per question to losing 0. That's the difference between 85 and 96.
+
+🧪 4. CONCEPT CONTAMINATION DETECTOR
+"That thing you think you understand — you don't fully."
+JARVIS takes any topic you've marked as stage 4 or 5 (mastered) and runs a "contamination test" — it generates 3 trick questions specifically designed to break surface-level understanding: edge cases, sign changes, boundary conditions, "what if the assumption is removed?" questions. If you fail one, the topic gets contaminated back to stage 3 and JARVIS explains exactly where your mental model broke. You don't just know the topic — you know it under pressure.
+Scenario: He's confident about "Superposition Theorem" — stage 5, mastered. JARVIS runs contamination: "A circuit has a dependent current source. Apply superposition." He hesitates. Dependent sources can't be deactivated. He didn't know that. Topic drops to stage 3. He re-learns it correctly. That exact trap appears in the final. He's the only one who gets it right.
+
+📐 5. DOCTOR DNA EXTRACTION
+"Every doctor has a signature. JARVIS reads it before you even walk in."
+Beyond the existing "instructor focus" text field, this feature builds a living behavioral profile of each doctor automatically from past exams + any graded work you upload. It extracts: What percentage of questions are recall vs application vs analysis? Do they test definitions or derivations? Do they recycle old questions with changed numbers? Do they reward long answers or concise ones? Do they penalize wrong units? This profile gets richer every exam you feed it and becomes the foundation of every future prediction.
+Scenario: Three past exams uploaded for Dr. Mohamed. JARVIS extracts his DNA: 40% of marks come from circuit analysis problems, he always has one question that looks easy but has a hidden trick (usually about sign convention), he never asks the same formula twice but always asks adjacent applications of the same formula, and he gives partial credit only if you show the setup. She walks into every exam knowing this man's mind better than he knows it himself.
+
+⚡ 6. LIGHTNING ROUND — 60-Second Micro-Drills
+"Between classes. On the bus. In the elevator. Never waste a minute."
+A widget on the dashboard: "60-Second Drill." Tap it. JARVIS picks your single weakest topic across all subjects right now (lowest stage, most overdue) and fires exactly one high-difficulty question. You have 60 seconds on a timer to answer by voice or text. JARVIS grades it instantly and either advances or holds the topic. No navigation, no setup, no menus. Open app → answer question → close app. Done in 90 seconds total. This happens 4-6 times a day naturally without effort.
+Scenario: He's waiting for the elevator between lectures. He opens the app. Drill fires: "State the condition for maximum power transfer." He answers by voice in 20 seconds. JARVIS grades it: 9/10, advances topic. Closes app. He just did a meaningful review in 35 seconds. Over a semester, that's 400+ micro-reviews he would never have done otherwise. The compound effect is enormous.
+
+🩻 7. EXAM TRAUMA SCANNER
+"Your brain has a specific list of topics it panics under pressure. Let's map it."
+Before each exam, you do a timed simulation: JARVIS gives you 10 questions, each with a 90-second timer. It's not the answer that matters — it's how quickly you start writing. JARVIS tracks your hesitation time per topic. Topics where you start writing in under 10 seconds = solid. Topics where you stare for 30+ seconds = trauma zones. The trauma map updates across exams. It finds patterns: "You freeze on any question that has two variables changing simultaneously." That specific hesitation is now targeted for drilling.
+Scenario: Under timed pressure, she freezes on any question involving both frequency AND phase shift at the same time. She didn't know this about herself. JARVIS identified it from 3 simulation sessions. She practices specifically those dual-variable problems for a week. Her freeze response disappears. She finishes the final exam 18 minutes early for the first time ever.
+
+📊 8. THE GRADE CEILING CALCULATOR
+"Exactly how many marks can you still win — and which assessments matter most."
+This is not a grade predictor. It's a grade optimizer. You input the full grading scheme for each subject (quizzes = 20%, midterm = 30%, final = 50%). JARVIS calculates: given what you've already scored, what is the maximum possible grade you can still achieve? More importantly, it calculates the marginal value of each remaining assessment: "Getting 90% on the final is worth 3 more grade points than getting 100% on Quiz 3. Stop studying for the quiz." It shows you exactly where to invest effort for maximum return.
+Scenario: Week 12. He's been studying equally for everything. Grade Ceiling runs: his midterm is locked at 68%. To get a B, he needs 82% on the final. To get an A-, he needs 94% on the final. But Quiz 4 (which he hasn't done) is only worth 5% — getting 100% on it only adds 1 grade point. JARVIS tells him: "Ignore Quiz 4 optimization. Every hour you spend on the final is worth 6x more." He redistributes his time. Gets the A-.
+
+🌀 9. CONFUSION CASCADE MAPPER
+"You don't understand Topic B because you never properly understood Topic A."
+When you add study topics, JARVIS asks: "What concepts does this topic depend on?" Over time it builds a prerequisite graph per subject. When a topic is consistently failing (stage keeps resetting), JARVIS traces backward through the dependency chain to find the actual root: "You keep failing Op-Amp Feedback because you never fully understood Negative Feedback Stability, which itself depends on Gain-Bandwidth Product, which you marked as mastered but never tested under pressure." It traces the cascade to the actual broken foundation and makes you fix that first.
+Scenario: He's reviewed "Z-Transform Inverse" four times and it keeps failing. JARVIS traces the cascade: he's actually weak on "Partial Fraction Decomposition" from two subjects ago. That's the real problem. He spends 2 hours on partial fractions. Z-Transform Inverse clicks immediately. One deep fix instead of four surface-level re-reviews.
+
+🔑 10. THE NIGHT BEFORE INTELLIGENCE BRIEF
+"Not a summary. A tactical operations briefing for tomorrow's exam."
+This is different from a reminder. The night before each exam (auto-detected), JARVIS generates a highly specific, non-generic brief in your own voice — because it uses YOUR notes, YOUR past mistakes, YOUR mark history. It contains: the 3 topics most likely to appear based on what hasn't been asked in 2+ exams (statistical gap analysis), the exact 2-3 formatting habits that cost you marks with this specific doctor, a 90-minute pre-sleep study sequence ranked by impact, and one sentence at the end that's always the same: "You've been preparing for this. Trust your work."
+Scenario: 10 PM before the Digital Design final. The brief arrives. It says: "K-maps have appeared in every exam but 4-variable minimization hasn't appeared in 2 exams — high probability tonight. Dr. Tarek always puts a sequential circuit question last and students run out of time — do it second. You lost 9 marks this semester from not stating initial conditions in state diagrams. State them first." This brief is built from HIS data, HIS doctor, HIS mistakes. No student in his class has this. He walks in and the exam feels familiar.
+
+The ones worth building first — in order of "marks gained per hour of development":
+#FeatureMarks impactWhy buildable now6Lightning RoundHigh frequency compound effectgenerateQuiz + timer, one new widget8Grade CeilingChanges study strategy entirelyPure math on existing MarkModel + scheme input3Full Marks FormulaFixes invisible habitsCamera + Gemini Vision already in the stack10Night Before BriefEliminates last-minute panicNotifService + new Gemini prompt, 1 trigger1Mark SurgeonFinds the exact leakVoice memo + pattern analysis on existing marks🔑 10. THE NIGHT BEFORE INTELLIGENCE BRIEF
+"Not a summary. A tactical operations briefing for tomorrow's exam."
+This is different from a reminder. The night before each exam (auto-detected), JARVIS generates a highly specific, non-generic brief in your own voice — because it uses YOUR notes, YOUR past mistakes, YOUR mark history. It contains: the 3 topics most likely to appear based on what hasn't been asked in 2+ exams (statistical gap analysis), the exact 2-3 formatting habits that cost you marks with this specific doctor, a 90-minute pre-sleep study sequence ranked by impact, and one sentence at the end that's always the same: "You've been preparing for this. Trust your work."
+Scenario: 10 PM before the Digital Design final. The brief arrives. It says: "K-maps have appeared in every exam but 4-variable minimization hasn't appeared in 2 exams — high probability tonight. Dr. Tarek always puts a sequential circuit question last and students run out of time — do it second. You lost 9 marks this semester from not stating initial conditions in state diagrams. State them first." This brief is built from HIS data, HIS doctor, HIS mistakes. No student in his class has this. He walks in and the exam feels familiar.isn't this feature already there in exam preparation feature in the app, or its exist some where in the app.give me more ideas that pushes me towards A+ and be creative and use all advanced techniques for study and your knowledge of the app throw the zip file i uploaded to you previouslyShow more10:38 PMLet me audit every single AI feature in the app before suggesting anything.Ran 5 commandsRan 5 commandsRead the full advisor tabScriptRead the readMyDay feature in fullScriptRead the study tab in full to see spaced repetition featuresScriptCheck notifications service for any existing night-before logicScriptRead the exam notification scheduling to understand what triggers existScriptDoneNow I have the complete picture. The app has: scheduleExamNotifs that fires generic "exam tomorrow!" at 9 PM — zero AI, zero personalization. The existing Exam Prep (fullSubjectExamPrep) is a manual button-press, not auto-triggered. readMyDay is TTS of schedule data, not AI-generated. There is zero night-before AI intelligence anywhere. The feature I described is completely absent. Now let me give genuinely new ideas focused on A+:Ran 2 commandsRan 2 commandsCheck the spaced repetition implementation depthScriptCheck the ai_service and task working state featureScriptDoneNow I have a forensically complete picture of everything in the app. Here's what's confirmed to not exist anywhere:
+Your question answered first: No. The Night Before Brief is completely absent. The app fires a generic notification "⚠️ Exam TOMORROW! Study hard!" at 9 PM with zero AI, zero personalization, zero data. The Exam Prep feature (fullSubjectExamPrep) requires you to manually open the subject, navigate to the JARVIS tab, and tap a button. It never runs automatically. They are fundamentally different things.
+
+Now — genuinely new ideas built on deep knowledge of what you have and don't have:
+
+🩸 1. ANSWER SURGERY — Forensic Mark Loss Analysis
+"You're not losing marks randomly. There's a pattern. Find the cut."
+Right now MarkModel stores obtained/total/label — that's it. Answer Surgery adds one field: loss reason (voice or text, 15 seconds after entering any mark below 95%). Over a semester, JARVIS runs a cross-subject forensic analysis entirely from your own data:
+"You've lost 61 marks this semester. 38 of them (62%) share a single root cause: you solve correctly but skip writing the initial condition before applying a formula. This pattern appears in Electronics, Signals, and Circuits. Dr. Hassan and Dr. Tarek both penalize it. Fix one habit. Recover 38 marks."
+It doesn't suggest generic study tips. It reads your actual loss history and names the exact cut. The spaced repetition system already tracks topic mastery — this tracks answer behavior, which is completely different. You can know a topic perfectly and still lose marks through a habit.
+Scenario: He inputs his quiz results all semester, 30 seconds each, voice-noting what he lost marks on. Week 13, Answer Surgery fires: he loses marks in exactly 2 behavioral patterns across 5 subjects. He practices those 2 behaviors for 10 days. Gains 8+ marks on the final he would have left on the table for free — not because he learned anything new, but because he fixed how he writes what he already knows.
+
+⚡ 2. MICRO-FLASH DRILLS — 60-Second Ambient Learning
+"The most powerful study technique you'll never sit down to do."
+A floating card on the dashboard — not a page, not a button, just a card that's always there. Every time you open the app for any reason — to check your timetable, mark attendance, anything — JARVIS has pre-loaded one question from your weakest topic (lowest stage, most overdue). The card shows the question. Tap to reveal the answer. Swipe right: you knew it (topic advances). Swipe left: you blanked (topic stays). The whole interaction is 12 seconds. No navigation, no loading, no decision-making.
+This exploits something the app doesn't currently do at all: ambient review. The spaced repetition system exists but requires you to deliberately open the Study tab and press "Reviewed" with no actual recall test. This forces active recall every single time you open the app.
+Scenario: He opens the app 8 times a day — to check his schedule, add attendance, check a task. Each time a different question appears. He barely registers doing it. Over a semester that's 400+ active recall reps he never sat down to do. Exam week arrives. He knows 14 topics cold that he would normally have to cram. Cramming time drops by 60%.
+
+🔮 3. STATISTICAL GAP DETECTOR — "What Has Never Been Asked"
+"The most dangerous question on your exam is the one you didn't expect."
+This is pure data analysis on your uploaded past exams — no new AI calls needed for the logic, just Gemini once to extract topic lists. After you upload 2+ past exams for a subject, JARVIS builds two lists: Topics That Appeared and Topics In Study Materials. The difference is your gap list — topics that exist in your study materials but have never appeared in any past exam. These are statistically the highest-probability topics for your next exam, because they haven't been asked yet.
+"Warning: 'Z-Transform of Non-Causal Signals' appears in 3 of your study documents but has never appeared in any of Dr. Ahmed's past exams. Statistical pressure: HIGH. Last seen in materials: Week 8 lecture. Estimated probability: 73%."
+This is the difference between a student who studies what appeared and a student who studies what's about to appear. The data is already in your JarvisDocument model. The logic is pure set-difference.
+Scenario: She uploads 3 past exams. Gap Detector runs. It finds that "Bode Plot Phase Margin" appears in lecture notes and lab manual but has never been in a single past exam in 3 years. Statistical pressure: extreme. She adds it to her study plan. It appears on the final as a 15-mark question. She's the only one who prepared for it.
+
+🧬 4. SPACED REPETITION 2.0 — Difficulty-Weighted Intervals
+"The current system treats all topics equally. Your brain doesn't."
+Right now advanceStage() uses fixed intervals: 1, 3, 7, 14, 30 days for everyone. This is SM-2 Level 0 — the 1970s version. The upgrade: when you mark a topic as reviewed, JARVIS asks one question about it (uses generateQuiz which already exists). If you answer correctly on first attempt: standard interval. If you hesitate or get it partially: interval halved. If you get it wrong: reset to stage 1, interval = 1 day. The model is now tracking actual retrieval success rate per topic, not just "did I tap Reviewed."
+This means instead of 5 binary stages, topics have a retention score (0–100%) that decays exponentially over time (Ebbinghaus forgetting curve). The visual changes: topics don't show "Stage 3" — they show "78% retained, review in 4 days." Watch the number slowly drop. This is psychologically much more motivating.
+Scenario: He marks "Fourier Series" as reviewed Tuesday. Thursday he opens the app — retention shows 71%. Saturday: 58%. The number decaying in real time creates urgency he doesn't get from "Next review: Sunday." He reviews it Saturday. On the exam, it's perfect. The old system would have said review Sunday — he reviews it with 45% retention. This system had him reviewing at 58%. That gap is the difference between confused recall and confident recall.
+
+🎭 5. DOCTOR BEHAVIORAL FINGERPRINT
+"Every doctor has tells. JARVIS reads them so you don't have to."
+The existing subjectMetadata.instructorFocus is a single text field you manually fill in. The Fingerprint replaces this with a living, auto-updating behavioral profile built entirely from your uploaded past exams. After each exam upload, Gemini extracts and stores structured data about this doctor's patterns:
+
+Question type distribution (MCQ / derivation / numerical / essay) → exact percentages
+Recurring trap patterns ("always has one question where the answer is 0 or undefined")
+Partial credit behavior ("gives 2/5 if setup is correct but calculation wrong")
+Formula citation preference ("always requires theorem name before application")
+Time pressure signature ("last question always takes 3x longer than it looks")
+
+This profile appears at the top of every Exam Prep, every Night Before Brief, every predicted exam. It deepens automatically every time you add a past exam. After 3 exams, it knows this doctor better than his own students do.
+Scenario: Dr. Tarek's fingerprint after 3 uploaded exams: "40% numerical problems, always involving at least 2 simultaneous constraints. Traps: sign conventions in 2 of 3 exams. Partial credit confirmed: 2/5 for correct method with arithmetic error. Requires: circuit diagram before any solution. Never asks pure definition questions." She walks in with a mental model of Dr. Tarek's exam design. She doesn't study randomly. She studies specifically for this fingerprint.
+
+🏹 6. THE FULL MARKS DECODER
+"There's a specific format that earns 5/5 from this doctor. JARVIS will tell you what it is."
+This requires one piece of input you currently have no way to capture: returned exam papers with marks written on them. You photograph a returned exam (camera → Gemini Vision). JARVIS reads both your handwritten answer AND the doctor's red marks/comments. Over multiple returned exams, it builds a rubric reverse-engineering model per doctor:
+"For Dr. Hassan, a perfect answer on a circuit analysis question requires exactly: (1) Circuit redraw with labeled unknowns, (2) KVL/KCL explicitly stated by name, (3) System of equations written before solving, (4) Answer boxed with units. Missing any one of these costs 1–2 marks regardless of whether your calculation is correct."
+This is not general study advice. It's a reverse-engineered checklist extracted from your actual graded work. Before submitting any exam question, you run this checklist in your head. Every question.
+Scenario: He photographs 2 returned midterms. The decoder runs. It finds: he lost 17 marks across both exams not because his calculations were wrong — they were right — but because he never writes the governing equation before applying it. Dr. Tarek's rubric explicitly rewards writing the setup. He changes one habit. Gains 17 marks on the final. That's an entire letter grade from one behavioral change.
+
+📡 7. EXAM RADAR — Live Threat Assessment
+"Not a countdown. A threat level. Updated every time your data changes."
+A permanently-visible widget on the dashboard (replacing the plain progress bar) that shows all upcoming exams as a threat radar — circular, dark, neon-tinted. Each exam is a blip on the radar. Blips that are close and red = imminent + you're not ready. Blips that are far and green = time + prepared. The position (distance from center) = days until exam. The color = readiness score calculated live from: topic mastery average for that subject + marks trend + how many documents are uploaded + last Enigma Prep date.
+The radar updates every time you study a topic, add a mark, or upload a document. You can literally watch a red blip turn yellow then green as you prepare. It makes readiness viscerally visible instead of a number you have to calculate yourself.
+Scenario: Tuesday morning, he opens the app. The radar shows 3 blips: Digital Design (3 days, red, close), Electronics (8 days, orange, medium distance), Mechanics (12 days, green, far). He doesn't need to think — his brain processes "red thing close, fix it now." He opens Digital Design and studies for 2 hours. The blip shifts to orange. He feels it. The emotional feedback loop is 10x stronger than a progress bar that goes from 43% to 47%.
+
+🕵️ 8. CONFUSION ORIGIN TRACER
+"You failed this topic 3 times. The actual reason is a topic from 4 weeks ago."
+When any topic resets to stage 0 more than twice, JARVIS triggers a diagnostic. It pulls the topic's content from your notes and asks Gemini: "What prerequisite concepts does this topic depend on?" It then checks those prerequisite topics in your study data — are they mastered or not? If it finds an unmastered prerequisite, it tells you:
+"You've failed 'Op-Amp Negative Feedback' 3 times. This topic depends on 'Gain-Bandwidth Product' (your stage: 1/5) and 'Closed-Loop Transfer Function' (your stage: 0/5). You're trying to build the 4th floor before the 2nd floor exists. Fix these two first."
+This is the most common A student failure pattern: drilling a hard topic repeatedly while the foundational gap causing the failure goes undiagnosed. The app currently tracks topic stages but has zero concept of prerequisite relationships. This feature wires them together.
+Scenario: He reviews "State Machine Design" 4 times and it never sticks. Confusion Tracer fires: the actual gap is "Mealy vs Moore Output Logic" — a topic he marked "Mastered" two months ago but never actually tested under pressure. He reviews that one topic for 45 minutes. State Machine Design clicks immediately on the 5th attempt. He never would have found the real problem on his own.
+
+🔑 9. THE NIGHT BEFORE BRIEF (confirmed: does not exist)
+Auto-triggered at 9 PM the night before any exam. Not a notification. A full AI briefing.
+The app currently sends: "⚠️ Exam TOMORROW! Study hard!" — that's the entire existing feature. The Brief is fundamentally different: it's a Gemini call that fires automatically at 9 PM, triggered by scheduleExamNotifs (which already fires at that exact time), using all your subject data as context:
+
+Statistical gaps (topics in materials never asked in past exams = tonight's priorities)
+Your personal loss patterns (from mark history — the exact 2 habits that cost you marks with this doctor)
+Your mastery gaps (which topics are below stage 3 right now)
+A sequenced 90-minute study plan (not generic, timed to the gaps above)
+Final line, always: "You've been preparing for this. Trust your work."
+
+It uses data no other student has access to — because it comes from YOUR past exams, YOUR mark history, YOUR topic stages. The notification opens directly to a full-screen rendered markdown brief, not a chat window.
+Scenario: 9 PM before the Digital Design final. Notification fires. He opens it. The brief says: "K-maps have appeared in every exam but 4-variable minimization hasn't — high probability tonight. Your topic stage for '4-var K-maps': 2/5 — review this first. You've lost 9 marks from not stating initial conditions in state diagrams with Dr. Tarek — state them first tonight. Study sequence: K-maps 30 min → State diagrams 25 min → Review flip-flop timing 20 min → sleep." 7 other students get "study hard." He gets this.
+
+🧠 10. ACTIVE RECALL ENGINE — The Question You Haven't Answered Yet
+"Spaced repetition without questions is just reading. Reading doesn't build exam memory."
+The biggest gap in the current system: the Study tab marks topics as "Reviewed" with a single tap. No question asked. No retrieval required. This is passive review — it feels productive but has almost no effect on exam performance compared to active recall.
+The fix: when you tap "Reviewed" on any topic, instead of immediately advancing the stage, JARVIS asks one question generated from your uploaded documents for that subject. You answer by voice (30 seconds) or text. JARVIS grades it with one word: "Correct / Partially / Wrong" — and the stage advances or holds accordingly. The question takes 40 seconds total. But now every "review" session is actually building the neural pathway that exam recall requires.
+Stage advancement is now earned, not given. The intervals [1, 3, 7, 14, 30] days remain — but the stage only moves if you actually retrieved the information under pressure. This is the SM-2 algorithm as it was designed, not the tap-and-advance version currently implemented.
+Scenario: She has 18 topics all at "Stage 3" because she reviewed them by tapping Reviewed. On the exam, she blanks on 6 of them — she recognized them when studying (passive) but can't produce them under pressure (active). After Active Recall Engine: those same 18 topics require her to actually answer a question before advancing. She gets 4 wrong the first time. Those 4 go back to Stage 1. She re-reviews them with active recall. On the exam, she produces all 18 from memory. The tap-and-advance habit was costing her marks she didn't know she was losing.
+
+Ranked by marks gained per hour of development — build in this order:
+#FeatureMarks impactEffortWhat it uses10Active Recall EngineTransforms existing SR systemLowgenerateQuiz + stage logic tweak2Micro-Flash DrillsPassive ambient reps → activeLowExisting topic data + 1 widget9Night Before BriefEliminates last-minute blindnessMediumscheduleExamNotifs + Gemini call3Statistical Gap DetectorFinds what's about to appearMediumExisting JarvisDocument + set logic1Answer SurgeryFinds your invisible mark leaksMediumNew lossReason field + pattern analysisour doctors dosen't return us the exam papers, don't count on that,
+continue the creative ideas flow11:09 PMGood constraint. Now I know even more precisely what data is available. Let me re-audit what you actually have to work with.Ran 5 commandsRan 5 commandsRead attendance tracking logic in depthScriptUnderstand all bloc events and XP logic deeplyScriptRead subject notes model and metadata model completelyScriptRead semester, reminder and exams modelsScriptAudit exact database schema to know every data field availableScriptDoneNow I have the complete forensic picture. I know every byte of data in the database, every AI capability in the stack, every gap. No exam papers returned. No camera-based grading. Here are genuinely new ideas, each one impossible to have suggested without reading your actual codebase:
+
+🧠 1. ACTIVE RECALL GATE — The Review Button Becomes an Exam
+"Tapping 'Reviewed' should be the hardest thing in the app."
+Right now ReviewTopic in your BLoC fires topic.advanceStage() on a single tap — zero retrieval required. The stage number is a lie. The fix: intercept that tap and show a bottom sheet with one AI-generated question from the subject's uploaded documents. Voice answer (Groq Whisper is already wired) or text. JARVIS grades it: Correct (advance stage, next interval doubles) / Partial (hold stage, retry in 1 day) / Wrong (drop to stage 1, retry tomorrow).
+The intervals [1, 3, 7, 14, 30] in advanceStage() already exist — they just trigger without any proof of memory. This makes them earned. The question is generated once per topic per session — cached so it doesn't re-call Gemini on every tap.
+Scenario: He taps "Reviewed" on "Thevenin's Theorem." Instead of advancing, a question appears: "A circuit has both a dependent and independent source. Outline the Thevenin procedure." He answers. JARVIS says: "Partial — you forgot to deactivate dependent sources differently." Stage holds. He sees this gap the week before the exam, not during it. That one held stage saves him 8 marks.
+
+⚖️ 2. THE GRADE CEILING OPTIMIZER
+"Stop studying for quizzes when your final exam is worth 10x more."
+Pure math on existing MarkModel data — no new AI needed. Add a "Grading Scheme" to each subject (quiz weight %, midterm weight %, final weight %). The optimizer then calculates — given your current scores — the marginal return on effort for every remaining assessment:
+"Electronics — remaining assessments:
+• Quiz 4 (5% weight): Getting 100% instead of 0% = +0.8 final grade points
+• Final exam (50% weight): Each +10% = +5.0 final grade points
+→ Every hour on the final is worth 6.25x more than an hour on Quiz 4."*
+Display this as a visual bar: each remaining assessment ranked by leverage. The one with the longest bar is where your next hour should go. This is the feature that turns a 79% student into an 87% student — not by studying harder, but by studying smarter on the right assessment at the right time.
+Scenario: Week 12. She's been splitting time equally between 4 subjects. Grade Ceiling runs. It shows: in Digital Logic, the final is worth 60% of the grade and she currently has 71% in the course — one strong final performance changes everything. In Mechanics, she already has 88% — the final can barely hurt her. The optimizer tells her to spend 70% of her remaining time on Digital Logic. She does. She gets an A- instead of a B.
+
+📻 3. THE KNOWLEDGE PODCAST — JARVIS Teaches You While You Walk
+"You have 20 minutes between lectures. JARVIS can teach you a topic in that time."
+You already have flutter_tts wired in campus.dart and Groq Whisper for voice. The Knowledge Podcast takes your weakest topic (lowest stage, most overdue) and generates a spoken audio lesson — not a summary, an actual structured 3-minute audio explanation: concept introduction, one worked example, one common mistake, one exam tip. JARVIS speaks it through TTS. You listen while walking to your next class.
+The lesson is generated once, cached as a SubjectNote automatically, and re-listenable. It uses the subject's uploaded documents as source material. The format is designed for ears, not eyes: no equations, just language — "Think of it this way: Thevenin's theorem is like replacing the entire power grid of Cairo with a single battery and one resistor…"
+Scenario: 8 minutes between Electronics lecture and Signals section. He opens the app, taps "Teach me something." JARVIS speaks for 3 minutes about "Frequency Response — Bode Plots" (his stage 1 topic). It's not reading notes at him — it's a real explanation, analogy included. He arrives at Signals having genuinely learned something. Over a semester that's 40+ micro-lessons absorbed without sitting down to study.
+
+🔭 4. STATISTICAL GAP RADAR — "What Has Never Been Asked"
+"The most dangerous question in your exam is the one you didn't see coming."
+This is purely mechanical — no AI guesswork. After you upload 2+ past exams for a subject, JARVIS uses Gemini to extract a structured list of topics that appeared in each exam. It then builds two sets:
+Set A: Topics extracted from all past exams
+Set B: Topics in your StudyTopic list + topics extracted from lecture notes/documents
+Set B minus Set A = Your Gap List — topics that exist in the curriculum but have never been asked. These aren't random — they're statistically overdue. A doctor who hasn't asked about "Z-Transform of Non-Causal Signals" in 3 years is statistically more likely to ask it now than something they asked twice last year.
+The gaps are ranked by "appearance pressure" (how many study materials reference it vs. how many times it's appeared). Displayed as a threat list with probability estimates. These automatically become your highest-priority topics for the upcoming exam.
+Scenario: 3 past exams uploaded for Dr. Ahmed. Gap Radar finds: "Parallel RLC Resonance" appears in 2 lecture files and the lab manual but has never appeared in any exam. "Series RLC" appeared in all 3 exams. The radar flags Parallel RLC as red — it's statistically overdue. He adds it to his study plan. It's worth 20 marks on the final. He's the only one who studied it specifically.
+
+🕐 5. DEADLINE VELOCITY TRACKER
+"You're not behind on this task. You're behind on the PACE to finish it."
+Your TaskModel already stores createdAt, dueDate, and completedAt. Deadline Velocity adds one new concept: expected daily progress. When you add a task, JARVIS estimates the scope (assignment = 1 day, project = 5 days, report = 3 days — configurable). It then tracks whether you've started working on it by calculating: days elapsed ÷ days total = expected % done by now.
+On the dashboard, tasks don't show "due in 4 days." They show:
+"Digital Logic Report — Expected: 60% done by now — Status: Not started → CRITICAL VELOCITY DEFICIT"
+The color shifts from green → yellow → red not based on due date but based on the gap between where you should be and where you are. A task due in 4 days that you haven't started is red. A task due tomorrow that you've been working on for 3 days is green.
+Scenario: Thursday. He added a report 5 days ago, due Sunday. Deadline Velocity says: "Expected pace: 72% complete by today. Estimated completion at current velocity: Never." He opens it right then. He wouldn't have noticed until Saturday night. He finishes it Sunday morning, calm, not panicking.
+
+🏗️ 6. CONCEPT SCAFFOLDING ENGINE
+"You're trying to learn Chapter 5 without understanding Chapter 2."
+When you add a new StudyTopic, JARVIS fires one Gemini call: "What concepts must a student understand before learning [this topic]?" It returns a prerequisite list. Each prerequisite is cross-referenced against your existing topics database — are they mastered (stage 5) or not?
+If a prerequisite is missing or weak, the new topic is flagged with a warning: "⚠️ Learning 'State Machine Design' requires: Mealy vs Moore (your stage: 1/5), Flip-Flop Timing (your stage: 0/5). Study these first or you'll waste time."
+The topic doesn't get blocked — you can still study it. But it shows a dependency chain that makes the study order obvious. When you fail a topic 3 times, the scaffolding engine automatically traces backward: "You've failed this 3 times. Root cause detected: 'Flip-Flop Timing' is unmastered. Fix that first."
+Scenario: He's reviewed "Z-Transform Region of Convergence" four times and it keeps failing on the active recall gate. Scaffolding Engine activates: "Root cause detected: 'Z-Transform definition and convergence basics' — your stage: 1/5. This is the prerequisite. Fix it first." He spends 45 minutes on the basics. On the 5th attempt, ROC clicks perfectly. He saved 3 wasted revision sessions and found the actual gap.
+
+📈 7. MOMENTUM ENGINE — Your Study Streak Has Stakes
+"A streak you can't bear to break is more powerful than any alarm."
+Your XP system already exists with total_xp, early bird bonuses, clutch penalties. The Momentum Engine adds streaks with compounding multipliers — but makes them psychologically addictive by showing exactly what you'll lose if you break them.
+Every day you complete at least one Active Recall review: +1 streak day. Your XP multiplier = 1.0 + (streak × 0.1). At 10-day streak: 2x XP on everything. At 20 days: 3x. Breaking the streak resets to 1.0x. The dashboard shows one number prominently: "🔥 Day 14 — 2.4x multiplier — Break tomorrow: lose 8,400 XP".
+The key psychology: showing the cost of breaking rather than the reward of continuing. It exploits loss aversion — which is 2x stronger than reward motivation psychologically. You don't study to gain XP. You study to not lose 8,400 XP.
+Scenario: 11 PM. He's tired. He almost skips studying. He opens the app to check tomorrow's schedule and sees: "🔥 Day 19 — 2.9x multiplier — Breaking tonight costs 12,600 XP." He reviews 2 topics in 6 minutes to preserve the streak. Over the semester, those 6-minute sessions that "almost didn't happen" add up to 40+ extra review sessions he would have missed.
+
+🎙️ 8. VOICE EXAM SIMULATOR — Speak Your Answer Under Pressure
+"Writing in an exam is easy. Speaking forces you to actually know it."
+Using the existing record package + Groq Whisper already in jarvis_service.dart, add an "Oral Exam Mode" to any subject. JARVIS asks a question. You have 90 seconds to speak your answer out loud. Whisper transcribes it. JARVIS grades the transcription with Gemini — not just "correct/wrong" but a breakdown: "You got the core right but you used 'voltage' where you meant 'current' twice. Under exam pressure, this causes calculation errors downstream."
+Speaking forces retrieval in a fundamentally different way than writing. The brain can't rely on recognition (seeing the right answer and thinking "yes, that's right"). It must produce the answer from scratch — exactly what an exam requires. It also exposes verbal confusion patterns: concepts you "know" but can't explain clearly don't survive speaking.
+Scenario: She does Oral Exam Mode on "Transfer Function Derivation" the week before her final. She speaks her answer. JARVIS transcribes it and grades: "Good structure but you never stated the Laplace domain assumption at the start. Dr. Hassan's rubric requires this — you would lose 2 marks. Also: you said 'the poles are where the numerator is zero' — that's zeros, not poles. This error appears twice." She corrects both in 20 minutes. She would never have caught either from silent reading.
+
+🌡️ 9. ACADEMIC HEALTH MONITOR — Your Semester's Vital Signs
+"By the time you realize you're failing a subject, it's too late to fix it."
+Replace the simple subject health bars in the Advisor tab with a live vital signs dashboard for the semester. Each subject gets 5 indicators tracked over time:
+
+Mark Trend: last 3 assessments, going up or down?
+Topic Retention: average stage across all topics — decaying or growing?
+Attendance Risk: absences as % of maximum — safe, warning, critical
+Task Health: ratio of completed to overdue tasks for this subject
+Engagement Score: days since last study session / document upload / JARVIS interaction
+
+Combine them into one Subject Vitality Score (0-100). Show it as an EKG-style line chart over time, not a static bar. A subject that was 80% two weeks ago and is now 65% shows a declining flatline — you see the deterioration happening before it becomes a crisis.
+Scenario: Week 9. She opens Academic Health. Mechanics shows: vitality dropped from 82 to 61 in 2 weeks — marks trending down (quiz 3 was 71%), 4 topics overdue for review, 0 study sessions in 6 days. It looks like a patient with declining vitals. She feels the urgency without JARVIS having to tell her anything. She opens Mechanics and runs the full Enigma Prep. She catches it before it costs her the semester.
+
+💥 10. EXAM POST-MORTEM — What Actually Happened In There
+"You just walked out of an exam. JARVIS needs your intel before it fades."
+Immediately after each exam's scheduled time passes, a notification fires: "Post-mortem window open — 30 minutes. What happened in there?" Open it → a structured 90-second voice debrief with 4 specific questions:
+
+"Which topic surprised you?" (unexpected material)
+"Which question took the most time?" (time pressure signature)
+"What did you write that you're not sure about?" (confidence gaps)
+"Anything the doctor said or did that was unusual?" (behavioral signal)
+
+Groq Whisper transcribes all 4 answers. JARVIS stores them as a SubjectNote with category "post_mortem". Across multiple exams with the same doctor, these debrief notes build an intelligence picture of that doctor that nothing else can provide — because it comes from inside the exam room.
+This feeds back into the Night Before Brief, the Doctor Fingerprint, and the Statistical Gap Radar. The debrief you give after tonight's exam makes next semester's exam prep 40% more accurate for the same doctor.
+Scenario: He walks out of the Digital Logic midterm. Notification fires. He records 60 seconds while walking out of the building: "Q4 was about 4-variable K-maps — came from nowhere, I wasn't ready. Q2 took 25 minutes and I panicked. The doctor added a bonus question on sequential circuits." Stored. Next time he has Dr. Tarek, the brief includes: "Prior post-mortem flagged: K-maps under-prepared, sequential circuits likely bonus question, Q2-level problems require 25-minute allocation." He plans his time accordingly. He finishes the exam.
+
+Build order — highest marks per hour of development:
+#FeatureRoot gap it fixesEffort1Active Recall GateSR without retrieval = uselessLow — intercept 1 BLoC event4Statistical Gap RadarStudying what appeared, not what's comingMedium — Gemini set-difference2Grade Ceiling OptimizerWrong effort distribution across semesterLow — pure math on MarkModel10Exam Post-MortemZero institutional memory across examsLow — notification + voice note8Voice Exam SimulatorCan't produce answers, only recognize themMedium — Whisper already wiredokay those feature are review and i choosed some of them to add, don't repeat them
+give me the creative ideas the hit12:04 AMLet me audit exactly what's been discussed so I never repeat anything.Ran 5 commandsRan 5 commandsCheck confetti and celebration features plus all imported packagesScriptRead the entire focus tab to understand deep study timerScriptFind completely untouched data dimensions and unused database tablesScriptFind how doc analysis is stored, chat history depth, and absence-mark correlation gapsScriptRead JARVIS chat brain to understand what learning science is and isn't being appliedScriptDoneGot it. No repeats. Let me find the untouched dimensions.Ran 3 commandsRan 3 commandsFind every time-series data point that has never been analyzedScriptLook for behavioral data that's collected but never analyzedScriptRead gap finder and focus session completion logicScriptDoneNow I have the complete forensic picture. Every data dimension, every behavioral signal collected but never analyzed, every cognitive science technique not yet applied. Here are genuinely new hits:
+
+💀 1. THE ABSENCE-MARK COLLIDER
+"Your attendance record is secretly your grade predictor. Nobody showed you the math."
+Your app stores every single absence with a date and type (lecture/section/lab). It also stores every mark with a date and score. These two datasets have never been cross-referenced — ever. The Collider runs one calculation: for each subject, plot absence count against mark scores on a timeline. Then it finds the specific correlation per subject and per doctor.
+The finding isn't generic "attend class." It's surgical: "In Electronics: you missed 3 consecutive lectures in Week 6. Your Quiz 3 score (47%) came 8 days later. The 2 topics from those lectures — Frequency Response and Bode Plots — appear in every past exam. These specific absences are projected to cost you 12–18 marks on the final."
+It maps which absences correspond to which exam weight, which topics were covered those days, and what the projected mark damage is. Your timetable already stores the subject per class. JARVIS can ask: what was likely taught that day based on the document corpus?
+Scenario: Week 11. He's missed 5 lectures total across 3 subjects. Normally he'd shrug. The Collider fires: "Your Electronics absences in Week 6 covered Frequency Response (3 lectures). This topic has appeared in 2 of 3 past exams and is currently Stage 0 in your study tracker. Projected damage: 15 marks. You have 9 days. Fix this first." He didn't know those specific missed lectures were a time bomb. Now he does.
+
+🎯 2. THE INTERLEAVING ENFORCER
+"The way you're studying is the reason you're forgetting."
+Cognitive science finding (Kornell & Bjork, 2008): studying one topic until mastered (blocked practice) feels productive but produces 40% worse exam recall than switching between topics randomly (interleaved practice). Right now your study tab shows topics sorted by due date — which encourages blocking. Students naturally study one topic completely, then move to the next. This is scientifically wrong.
+The Interleaving Enforcer builds today's study queue differently: instead of "study K-maps for 45 minutes," it says "do these 6 topics in this specific shuffled order across subjects: 15 min K-maps → 10 min Transfer Functions → 12 min State Machines → 10 min Bode Plots → 15 min K-maps again → 8 min State Machines again." The same material, studied in a scrambled sequence across subjects, with forced context-switching. The forgetting that happens during each switch is what builds durable memory.
+The interleaved queue is auto-generated from your overdue topics across all subjects, weighting by stage and exam proximity. One button: "Generate Today's Interleaved Session." No decisions required.
+Scenario: The night before her midterm she's been blocked-studying Circuits for 3 hours. She knows it cold right now. By tomorrow morning, 40% of it will have faded. She runs Interleaved Session instead: 8 topics across 3 subjects in a scrambled sequence. It feels harder. She gets more wrong during the session. That discomfort is the memory forming. She walks into the exam and recalls everything under pressure because she's been practicing under pressure all along.
+
+🕳️ 3. THE ILLUSION OF KNOWING DETECTOR
+"You think you know it. You don't know that you don't know it."
+The most dangerous state in studying: a topic at stage 4-5 (mastered) that you actually can't reproduce under exam conditions. You marked it reviewed weeks ago. It felt familiar. That feeling was recognition — not recall. They're neurologically different.
+The Detector runs a quarterly audit (every 2 weeks): for every topic at stage 4+, it generates one transfer question — not a definition question, but an application to a context you've never seen. Not "what is Thevenin's theorem" but "a circuit you've never seen before has these specific values — apply Thevenin to find the equivalent as seen from terminals A-B." If you can't answer it in 90 seconds, the topic gets flagged: ILLUSION DETECTED — dropped back to stage 2.
+The insight: the SM-2 algorithm (which your app uses) was designed for language vocabulary. For engineering concepts that require application under novel conditions, it systematically overestimates mastery. The Detector patches this gap.
+Scenario: 14 topics are showing Stage 5 — mastered. Illusion Detector runs. 6 of them fail the transfer test. He was about to walk into the exam confident about those 6. Instead, he spends 2 days on the real gaps. He walks in actually prepared, not just feeling prepared. The difference between those two states is measured in letter grades.
+
+🔀 4. ELABORATIVE INTERROGATION ENGINE
+"Don't memorize what. Understand why. The why is what survives exam pressure."
+Proven in 40+ studies: asking "why is this true?" and generating your own explanation produces 2-3x better retention than re-reading or summarizing. Your notes tab currently just stores content. The Elaborative Interrogation Engine transforms any note or topic into a why-chain:
+You tap any topic → JARVIS asks: "Why does this work this way? Explain it like the concept has to justify its own existence." You voice-answer for 60 seconds. JARVIS doesn't grade right/wrong — it analyzes the depth of your explanation: Did you invoke a more fundamental principle? Did you connect it to another concept? Did you give a concrete example?
+If you said "Thevenin works because... it simplifies the circuit," JARVIS responds: "Surface answer. Why can any linear circuit be simplified to one source and one resistor? What mathematical property makes that possible? Go deeper." It pushes until you hit bedrock understanding — the level where nothing can surprise you on an exam.
+Scenario: She's been memorizing "the superposition theorem states that..." for three weeks. Interrogation Engine: "Why does superposition work? What mathematical property of circuits allows it?" She can't answer. JARVIS tells her: linearity — the output is a linear function of each input, so contributions add independently. She now understands why superposition works, not just that it works. On the exam, when the doctor gives a modified circuit with a dependent source (where superposition doesn't apply the same way), she's the only one who reasons through it correctly. Everyone else pattern-matched. She understood.
+
+🏚️ 5. THE DECAY HEATMAP
+"Watch your knowledge rot in real time."
+Right now a topic at stage 3 shows "Due in 4 days." That's a date, not a feeling. The Decay Heatmap makes forgetting visceral: using Ebbinghaus's forgetting curve formula (R = e^(-t/S) where t = days since last review, S = stability factor per stage), it calculates a live retention percentage for every topic, updated every time you open the app.
+A 7x5 grid — rows = subjects, columns = days of the week. Each cell is a topic node. Color: bright white = 95%+ retained, fading to amber at 60%, deep red at 30%, black at near-zero. Topics you "mastered" 3 weeks ago without testing are visibly rotting in real time. The entire grid breathes — you can watch your knowledge decay between sessions.
+The psychological effect: seeing a white node turn amber during a 2-hour study session motivates you more than "next review: Tuesday." Loss is more motivating than gain. The heatmap makes losing knowledge visible.
+Scenario: He opens the app Monday morning. The heatmap shows 4 black nodes — topics that have decayed to near-zero retention since he last reviewed them 18 days ago. One is "Laplace Transform Properties" — he was planning to review it before the final anyway, but "before the final" was abstract. Watching it turn black on the heatmap triggers immediate action. He reviews all 4 that morning. They were going to blindside him.
+
+🎭 6. THE FEYNMAN PRESSURE COOKER
+"If you can't teach it simply, you don't understand it at all."
+Richard Feynman's method: the deepest test of understanding is whether you can explain a concept to someone with zero background, in plain language, without jargon. If you can't, you haven't understood it — you've memorized words.
+The Pressure Cooker takes any topic and gives you a character to explain it to — pulled from a dropdown: "Your 10-year-old cousin," "Your grandmother," "A journalist writing about engineering," "A business student." JARVIS sets the scene: "Your cousin just asked: 'What even is a capacitor and why does anyone care?'" You have 90 seconds. Voice answer. JARVIS transcribes and evaluates: did you use jargon? Did you give an analogy? Could a non-engineer actually follow it?
+If you used "impedance" without defining it: "Your cousin doesn't know what impedance means. Start over." If you gave a genuine analogy: "Good. Now explain what happens when the capacitor is fully charged — still in plain language."
+Explaining to a non-expert forces you to decompose the concept into its actual components, which is exactly the mental operation a complex exam question requires.
+Scenario: He runs Pressure Cooker on "Negative Feedback in Op-Amps" with the grandmother audience. He gets 3 words in and stops — he can't do it without saying "loop gain" and "inverting terminal." He realizes he doesn't actually understand negative feedback; he memorized its effects. He spends 45 minutes building a real mental model. On the exam, a question asks about an unusual feedback configuration he's never seen. He reasons from first principles. He gets it right. Everyone who memorized the formula gets it wrong.
+
+📡 7. CROSS-SUBJECT CONCEPT RADAR
+"That thing you're struggling with in Signals — you already learned it in Circuits."
+Engineering subjects share enormous conceptual overlap that nobody points out. Laplace transforms appear in Circuits AND Signals. Differential equations in Mechanics AND Electronics. Fourier analysis in Electromagnetics AND Signals. Students re-learn the same concept from scratch in each subject because nobody connected the dots.
+The Radar scans your topic lists and uploaded documents across ALL subjects using Gemini and builds a concept overlap map: "'Transfer Function' appears in 3 of your subjects. Your mastery: Circuits (stage 5), Signals (stage 2), Control Systems (stage 0). You already understand this concept — you just don't recognize it by its name in Signals. The Control Systems version is 80% identical to what you already know."
+When you're struggling with a topic in Subject B, it checks if you've already mastered a structurally identical concept in Subject A and tells you: "You already know this. You learned it as [concept name] in [subject]. It's the same idea wearing different clothes."
+Scenario: She's been struggling with "Poles and Zeros in the Z-domain" in DSP for two weeks. Cross-Subject Radar fires: "You mastered 'Poles and Zeros in the S-domain' in Control Systems (stage 5). These are mathematically isomorphic — replace s with z and the intuition transfers directly." She opens her Control Systems notes. The light turns on. One hour of bridging versus two weeks of confusion from scratch.
+
+⏱️ 8. THE EXAM TIME ALLOCATOR
+"You fail exams you know because you run out of time. Let's fix that."
+Your past exam documents contain question structures and mark allocations. JARVIS reads them and builds a time allocation model per doctor: how many marks per question type, how long each question type historically takes, what order minimizes time waste.
+Before each exam, it generates a personal time strategy: "Dr. Hassan's final: 3 hours, 100 marks. Based on past exams: Q1-3 (MCQ, 30 marks) = 25 minutes. Q4-5 (derivation, 40 marks) = 70 minutes. Q6 (design, 30 marks) = 50 minutes. Reserve 15 minutes for checking. START WITH Q4 — it's worth the most and the MCQs can be done faster at the end when you're warmed up."
+It also includes your personal risk profile: if your marks show you consistently lose points on long derivation questions (high marks, high risk), it allocates you more time there. If you're strong on MCQs, it tells you to burn through them first for momentum.
+Scenario: He walks into every exam and starts from Q1. In Dr. Tarek's exams, Q1 is always the hardest. He wastes 35 minutes and arrives at Q4 (worth 30 marks) with only 20 minutes left. Time Allocator tells him: "Start with Q3. It's worth 25 marks and matches your strengths. Do Q1 last — it's high difficulty, low relative return for you specifically." He finishes with 10 minutes to spare for the first time. Gains 14 marks he used to leave blank.
+
+🧲 9. CONCEPT GRAVITY — What Everything Else Orbits
+"Some topics are load-bearing walls. Fail those and 6 other topics collapse with them."
+Using your uploaded documents, JARVIS builds a centrality map of every topic in each subject. Some concepts are referenced constantly by other concepts (high gravity — load-bearing). Others are standalone facts. The map shows which topics, if not mastered, cause cascade failures across the whole subject.
+"In Digital Logic: 'Boolean Algebra Identities' is referenced by K-maps, Logic Gates, Circuit Simplification, and State Machine Design. It has the highest concept gravity in this subject. If this is below stage 4, your entire understanding of the subject is on sand."
+High-gravity topics get a special badge: ⚙️ CORE. They're automatically prioritized in your study queue regardless of their review date. Mastering a CORE topic advances 3 downstream topics simultaneously. Letting a CORE topic decay damages all of them.
+Scenario: She's been studying all topics equally. Concept Gravity reveals: in Circuits, "KVL/KCL" is a gravity-4 topic — it underlies Mesh Analysis, Nodal Analysis, Thevenin, Norton, and Superposition. She's treating it as one of 20 equal topics. It's not. She drills it to perfect mastery. Suddenly 5 other topics she was struggling with become easy — she didn't need to study them separately, she needed to master their foundation. She saves 6 hours of study time by finding the right leverage point.
+
+🌊 10. THE SPACING OPTIMIZER — Exam-Day Backwards Planning
+"Your spaced repetition schedule ignores the one date that matters: exam day."
+Your current intervals: 1, 3, 7, 14, 30 days. They're fixed regardless of when your exam is. A topic reviewed on a 14-day interval when your exam is in 10 days will be at peak decay exactly when you need it most. The Spacing Optimizer inverts the logic: given your exam date, it works backwards to calculate the optimal review schedule so every topic hits its peak retention on exam day.
+If your final is in 22 days, a stage-3 topic should be reviewed today (day 0), day 7, and day 19 — not the standard 7-day interval. A stage-1 topic: day 0, day 2, day 6, day 14, day 21. Every topic gets a custom schedule calculated so its Ebbinghaus curve peaks on exam morning, not 4 days before or after.
+This is the difference between the SM-2 algorithm (designed for vocabulary retention forever) and exam-targeted learning (maximizing recall at one specific moment). The data is all already in your app. The exam date is in your TaskModel. The topic stages are in StudyTopic. This is pure math applied to existing data.
+Scenario: He has a final in 18 days, 22 topics. Standard schedule: 11 of them have their next review after the exam. Spacing Optimizer recalculates all 22: their review dates shift so every single one peaks on day 17. He follows the schedule. Exam morning: every topic is at 90%+ retention simultaneously, for the first time in his academic career. He's never felt that prepared before. It wasn't more study — it was the right study at the right time.
+
+The 3 that will make the biggest difference to your grade, ranked:
+#FeatureWhy it hits different10Spacing OptimizerYour SR schedule actively works against exam day right now3Illusion of KnowingYou have "mastered" topics that will fail under novel exam pressure2Interleaving EnforcerThe way you currently study is scientifically proven to be the wrong way
