@@ -77,7 +77,8 @@ void main() async {
 
   // Initialize notification service — registers the background handler
   await NotifService.init();
-
+  await NotifService.init();
+  await NotifDiag.init(); // ← add this
   // ── Single WorkManager initialization for ALL background tasks ──
   // Both watchdog and intelligence engine use this shared dispatcher.
   await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);

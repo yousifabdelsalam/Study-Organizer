@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:study_organizer/models/topic.dart';
+import 'package:study_organizer/pages/notif_diagnostic_page.dart';
 import 'package:study_organizer/pages/subject_detail.dart';
 import 'package:study_organizer/services/ai_service.dart';
 import 'package:flutter/services.dart';
@@ -464,6 +465,13 @@ class _CampusPageState extends State<CampusPage>
                     context,
                     MaterialPageRoute(builder: (_) => const NovaSettingsPage()),
                   ),
+                ),
+                // Add this to your existing AppBar actions:
+                IconButton(
+                  icon: const Icon(Icons.bug_report_rounded, color: Colors.white54),
+                  tooltip: 'Notification Diagnostics',
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const NotifDiagnosticPage())),
                 ),
               ],
               bottom: const TabBar(
