@@ -330,8 +330,10 @@ class NotifDiag {
       }
 
       // Break down by ID range
-      final timetable =
-      pending.where((p) => p.id >= 900000 && p.id <= 935000).toList();
+      final timetable = pending
+          .where((p) =>
+      p.payload != null && p.payload!.startsWith('timetable:'))
+          .toList();
       final tasks = pending.where((p) => p.id < 100000).toList();
       final exams =
       pending
@@ -386,29 +388,8 @@ class NotifDiag {
           );
         }
       }
+    }catch(e){
 
-      // Warn about any orphaned timetable IDs outside the expected range
-      final orphaned =
-      pending
-          .where(
-            (p) =>
-        p.payload != null &&
-            p.payload!.startsWith('timetable:') &&
-            (p.id < 900000 || p.id > 935000),
-      )
-          .toList();
-      if (orphaned.isNotEmpty) {
-        await log(
-          'QUOTA',
-          'ORPHANED timetable IDs outside expected range (wasting quota slots):',
-          isError: true,
-        );
-        for (final p in orphaned) {
-          await log('QUOTA', '  orphan id=${p.id} payload="${p.payload}"');
-        }
-      }
-    } catch (e) {
-      await log('QUOTA', 'Quota check crashed: $e', isError: true);
     }
   }
 
@@ -699,7 +680,7 @@ class NotifService {
             presentSound: true,
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
         uiLocalNotificationDateInterpretation:
         UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload ?? '$id',
@@ -971,7 +952,8 @@ class NotifService {
       // Uses dayOfWeek from the MODEL (not a loop variable) so IDs are
       // identical across rescheduling calls.
       final minuteOfWeek = (e.dayOfWeek - 1) * 1440 + (h * 60) + m;
-      final baseId = 900000 + (minuteOfWeek * 3);
+      final weekTypeOff = e.weekType == 'both' ? 0 : e.weekType == 'odd' ? 1 : 2;
+      final baseId = 900000 + minuteOfWeek * 3 + weekTypeOff;
 
       // ── Handle exceptional (one-time) classes ─────────────────────────────
       if (e.isExceptional && e.exceptionalDate.isNotEmpty) {
@@ -1518,47 +1500,26 @@ class NotifService {
     required DateTime firstOccurrence,
     String? payload,
   }) async {
-    _ensureTimezone();
-    try {
-      await _p.zonedSchedule(
-        id,
-        title,
-        body,
-        tz.TZDateTime.from(firstOccurrence, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'timetable_notifs',
-            'Class Reminders',
-            channelDescription: 'Timetable',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentSound: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
-        // KEY: this is what makes the alarm auto-repeat every week
-        // on the same day-of-week and time without any rescheduling
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: payload ?? '$id',
-      );
-      NotifDiag.logSync(
-        'WEEKLY',
-        'Registered weekly repeat id=$id | "$title" | '
-            'first=${firstOccurrence.toIso8601String().split('T')[0]}',
-      );
-    } catch (e, stack) {
-      NotifDiag.log(
-        'WEEKLY',
-        '_scheduleWeeklyRepeating THREW id=$id: $e\n$stack',
-        isError: true,
-      );
-    }
+    // No longer uses matchDateTimeComponents — alarmClock mode doesn't support it.
+    // Schedules a single one-shot alarm. The midnight WorkManager job and
+    // _rescheduleNotificationsOnStart() handle rescheduling after each fires.
+    await schedule(
+      id: id,
+      title: title,
+      body: body,
+      when: firstOccurrence,
+      channelId: 'timetable_notifs',
+      channelName: 'Class Reminders',
+      channelDesc: 'Timetable',
+      payload: payload ?? '$id',
+    );
+    NotifDiag.logSync(
+      'WEEKLY',
+      'Registered one-shot (alarmClock) id=$id | "$title" | '
+          'fires=${firstOccurrence.toIso8601String().split('T')[0]}',
+    );
   }
+
 
   /// ISO weekday name abbreviation (1=Mon ... 7=Sun)
   static String _dowName(int dow) =>
