@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:study_organizer/services/class_alarm_service.dart';
 import 'package:study_organizer/services/midnight_scheduler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -78,6 +79,7 @@ void main() async {
 
   // Initialize notification service — registers the background handler
   await NotifService.init();
+  await ClassAlarmService.init();
   await MidnightScheduler.init();
   await NotifDiag.init(); // ← add this
   // ── Single WorkManager initialization for ALL background tasks ──

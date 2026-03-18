@@ -61,6 +61,7 @@ dependencies:
   workmanager: ^0.9.0+3          # Background watchdog task scheduler
   speech_to_text: ^7.3.0         # Continuous wake word listening
   video_player: ^2.10.1
+  flutter_foreground_task: 9.2.1
 
 
 dev_dependencies:

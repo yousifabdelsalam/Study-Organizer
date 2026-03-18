@@ -12,6 +12,7 @@ import 'package:study_organizer/pages/notif_diagnostic_page.dart';
 import 'package:study_organizer/pages/subject_detail.dart';
 import 'package:study_organizer/services/ai_service.dart';
 import 'package:flutter/services.dart';
+import 'package:study_organizer/services/class_alarm_service.dart';
 import 'package:study_organizer/widgets/nova_brief_card.dart';
 
 import '../services/nova_watchdog_service.dart';
@@ -164,6 +165,7 @@ class _CampusPageState extends State<CampusPage>
       final state = context.read<AppBloc>().state;
       _scheduleEndOfDayNotification(state);
       _rescheduleNotificationsOnStart(state);
+      ClassAlarmService.start();
       // Schedule precise class-time refresh timers for today
       final todayDow = DateTime.now().weekday;
       final todayEntries = state.timetable
