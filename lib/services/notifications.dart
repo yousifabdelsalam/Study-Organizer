@@ -566,7 +566,7 @@ class NotifService {
       'timetable_notifs',
       'Class Reminders',
       description: 'Timetable class reminders',
-      importance: Importance.high,
+      importance: Importance.max,
     ),
     const AndroidNotificationChannel(
       'reminder_notifs',
@@ -584,7 +584,7 @@ class NotifService {
       'read_my_day',
       'Read My Day',
       description: 'End-of-day schedule reading',
-      importance: Importance.high,
+      importance: Importance.max,
     ),
     const AndroidNotificationChannel(
       'urgent_tasks',
@@ -672,7 +672,7 @@ class NotifService {
             channelName,
             channelDescription: channelDesc,
             importance: Importance.max,
-            priority: Priority.high,
+            priority: Priority.max,
             actions: actions,
           ),
           iOS: const DarwinNotificationDetails(
@@ -716,7 +716,7 @@ class NotifService {
             channelName,
             channelDescription: channelDesc,
             importance: Importance.max,
-            priority: Priority.high,
+            priority: Priority.max,
             actions: actions,
           ),
           iOS: const DarwinNotificationDetails(
@@ -1530,4 +1530,16 @@ class NotifService {
     final doy = int.parse(intl.DateFormat('D').format(date));
     return ((doy - date.weekday + 10) / 7).floor();
   }
+
+  static Future<void> initForService() async {
+    _ensureTimezone();
+    try {
+      await _p.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        ),
+      );
+    } catch (_) {}
+  }
+
 }
