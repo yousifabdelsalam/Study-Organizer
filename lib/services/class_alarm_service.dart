@@ -10,79 +10,57 @@ void startCallback() {
   FlutterForegroundTask.setTaskHandler(ClassAlarmHandler());
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// TASK HANDLER — flutter_foreground_task v9.x exact signatures
-// ════════════════════════════════════════════════════════════════════════════
 class ClassAlarmHandler extends TaskHandler {
-  Timer? _classTimer;
 
-  // v9.x: second param is TaskStarter (not SendPort)
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    await NotifService.init();
+    NotifService.initForService();
     debugPrint('[ClassAlarm] Started — starter: ${starter.name}');
-    await _reschedule();
+    // Check immediately on start in case a class is right now
+    await _checkAndFire();
   }
 
-  // v9.x: void return, only DateTime param — no async, no SendPort
+  // Fires every 1 minute — this IS the clock, no Timers needed
   @override
   void onRepeatEvent(DateTime timestamp) {
-    debugPrint('[ClassAlarm] Heartbeat');
-    _reschedule();
+    _checkAndFire();
   }
 
-  // v9.x: second param is bool isTimeout (not SendPort)
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
-    _classTimer?.cancel();
     debugPrint('[ClassAlarm] Destroyed (isTimeout: $isTimeout)');
   }
 
-  Future<void> _reschedule() async {
-    _classTimer?.cancel();
+  // ── Core logic: runs every 60 seconds ─────────────────────────────────────
+  // If a class starts within the next 60 seconds → fire show() right now.
+  // No state, no memory, no Timers. Each call is fully independent.
+  Future<void> _checkAndFire() async {
     final now = DateTime.now();
     final classes = await _getTodayClasses(now);
 
-    if (classes.isEmpty) {
-      debugPrint('[ClassAlarm] No more classes today');
-      return;
-    }
+    if (classes.isEmpty) return;
 
-    classes.sort((a, b) => a.startTime.compareTo(b.startTime));
-
-    _ClassEntry? next;
     for (final c in classes) {
-      if (c.startTime.isAfter(now.subtract(const Duration(seconds: 5)))) {
-        next = c;
-        break;
+      final secondsUntil = c.startTime.difference(now).inSeconds;
+
+      // Fire if class starts within next 60 seconds (heartbeat window)
+      // or started within the last 30 seconds (late wakeup tolerance)
+      if (secondsUntil >= -30 && secondsUntil <= 60) {
+        debugPrint(
+          '[ClassAlarm] FIRING show() for "${c.title}" '
+              '(${secondsUntil}s from now)',
+        );
+        await NotifService.show(
+          id: c.notifId,
+          title: c.title,
+          body: c.body,
+          channelId: 'timetable_notifs',
+          channelName: 'Class Reminders',
+          channelDesc: 'Timetable',
+          payload: c.payload,
+        );
       }
     }
-
-    if (next == null) {
-      debugPrint('[ClassAlarm] All classes passed for today');
-      return;
-    }
-
-    final delay = next.startTime.difference(now);
-    if (delay.isNegative) return;
-
-    debugPrint(
-        '[ClassAlarm] Next: "${next.title}" in ${delay.inMinutes}m ${delay.inSeconds % 60}s');
-
-    final firing = next;
-    _classTimer = Timer(delay, () async {
-      debugPrint('[ClassAlarm] FIRING show() for "${firing.title}"');
-      await NotifService.show(
-        id: firing.notifId,
-        title: firing.title,
-        body: firing.body,
-        channelId: 'timetable_notifs',
-        channelName: 'Class Reminders',
-        channelDesc: 'Timetable',
-        payload: firing.payload,
-      );
-      await _reschedule();
-    });
   }
 
   Future<List<_ClassEntry>> _getTodayClasses(DateTime now) async {
@@ -122,10 +100,6 @@ class ClassAlarmHandler extends TaskHandler {
         final m = int.tryParse(parts[1]) ?? 0;
 
         final classDateTime = DateTime(now.year, now.month, now.day, h, m);
-        if (classDateTime
-            .isBefore(now.subtract(const Duration(minutes: 1)))) {
-          continue;
-        }
 
         final subName = subjectNames[subjectId] ?? 'Class';
         final emoji =
@@ -145,8 +119,6 @@ class ClassAlarmHandler extends TaskHandler {
         ));
       }
 
-      debugPrint(
-          '[ClassAlarm] ${result.length} classes today (weekday=${now.weekday}, weekType=$weekType)');
       return result;
     } catch (e) {
       debugPrint('[ClassAlarm] DB read failed: $e');
@@ -168,9 +140,6 @@ class _ClassEntry {
   });
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// PUBLIC API
-// ════════════════════════════════════════════════════════════════════════════
 class ClassAlarmService {
   static bool _initialized = false;
 
@@ -183,16 +152,16 @@ class ClassAlarmService {
         channelId: 'class_alarm_service',
         channelName: 'Schedule Guardian',
         channelDescription: 'Keeps class notifications running',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
+        channelImportance: NotificationChannelImportance.NONE,
+        priority: NotificationPriority.MIN,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
         showNotification: false,
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        // v9.x: int milliseconds — 900000 = 15 minutes
-        eventAction: ForegroundTaskEventAction.repeat(900000),
+        // 60000ms = 1 minute — this is the clock tick
+        eventAction: ForegroundTaskEventAction.repeat(60000),
         autoRunOnBoot: true,
         autoRunOnMyPackageReplaced: true,
         allowWakeLock: true,
