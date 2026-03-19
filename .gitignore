@@ -43,3 +43,30 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Logs
+*.log
+
+# Build/Compilation
+build/
+.dart_tool/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Packages
+*.zip
+*.tar.gz
+
+# Generated files
+.g.dart
+*.g.dart
+
+# Environment
+.env
+.env.local
+
+# Platform-specific
+ios/Pods/
+android/.gradle/
