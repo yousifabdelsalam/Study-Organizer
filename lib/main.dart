@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:study_organizer/services/class_alarm_service.dart';
@@ -60,37 +62,45 @@ void callbackDispatcher() {
 //   6. runApp()
 // ─────────────────────────────────────────────────────────────────────────────
 void main() async {
-  // CRITICAL: Must be called before any async work or platform channel use
-  WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock orientation to portrait (optional but prevents layout issues)
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  
+  runZonedGuarded(()async {
+    // CRITICAL: Must be called before any async work or platform channel use
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize timezone data AND set local location BEFORE NotifService.init()
-  try {
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
-  } catch (e) {
-    debugPrint('main() timezone init error (non-fatal): $e');
-  }
+    // Lock orientation to portrait (optional but prevents layout issues)
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  // Initialize notification service — registers the background handler
-  await NotifService.init();
-  await ClassAlarmService.init();
-  await MidnightScheduler.init();
-  await NotifDiag.init(); // ← add this
-  // ── Single WorkManager initialization for ALL background tasks ──
-  // Both watchdog and intelligence engine use this shared dispatcher.
-  await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    // Initialize timezone data AND set local location BEFORE NotifService.init()
+    try {
+      tz.initializeTimeZones();
+      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+    } catch (e) {
+      debugPrint('main() timezone init error (non-fatal): $e');
+    }
 
-  // Schedule background tasks (non-blocking — use shared WorkManager instance)
-  await NovaIntelligenceEngine.scheduleFridayRegen();
+    // Initialize notification service — registers the background handler
+    await NotifService.init();
+    await ClassAlarmService.start();
+    await MidnightScheduler.init();
+    await NotifDiag.init(); // ← add this
+    // ── Single WorkManager initialization for ALL background tasks ──
+    // Both watchdog and intelligence engine use this shared dispatcher.
+    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
-  // Open database
-  final db = await DatabaseHelper.instance.database;
+    // Schedule background tasks (non-blocking — use shared WorkManager instance)
+    await NovaIntelligenceEngine.scheduleFridayRegen();
 
-  runApp(EngineeringApp(db: db));
+    // Open database
+    final db = await DatabaseHelper.instance.database;
+
+    runApp(EngineeringApp(db: db));
+  },
+  (error,stack){
+    debugPrint('🔴 [ZONE ERROR] $error');
+    debugPrint('🔴 [ZONE STACK] $stack');
+  });
 }

@@ -1,34 +1,38 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATION SERVICE — CLEAN REWRITE
+//
+// Provides:
+//   1. NotifDiag          – Diagnostic logger (persistent file on device)
+//   2. NotifHealthMonitor – 6-layer smart error detection system
+//   3. NotifService       – Core notification scheduling service
+//
+// Public API is 1:1 compatible with all callers (app_bloc, campus, tasks,
+// midnight_scheduler, class_alarm_service, nova_watchdog_service, main).
+// ═══════════════════════════════════════════════════════════════════════════════
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:intl/intl.dart' as intl;
 import '../models/timetable.dart';
 import '../models/reminder.dart';
-import '../models/topic.dart';
-import '../models/subject.dart';
 import '../models/task.dart';
 import 'nova_audio_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NOTIFICATION DIAGNOSTIC LOGGER
-//
-// Writes every scheduling attempt, error, and system check to a persistent
-// file on device. Survives app restarts. Read from NotifDiagnosticPage.
-//
-// Usage:
-//   await NotifDiag.init();                    ← call once in main()
-//   await NotifDiag.runFull(entries, names, weekType);  ← full check
-//   await NotifDiag.readAll();                 ← get log string for display
+// §1  DIAGNOSTIC LOGGER
 // ═══════════════════════════════════════════════════════════════════════════════
+
 class NotifDiag {
   static const int _maxLines = 600;
   static File? _file;
 
-  // ── Init: open or create the log file ──────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   static Future<void> init() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
@@ -39,426 +43,41 @@ class NotifDiag {
     }
   }
 
-  // ── Write a log line ───────────────────────────────────────────────────────
-  static Future<void> log(
-      String tag,
-      String msg, {
-        bool isError = false,
-      }) async {
-    final now = DateTime.now();
-    final ts =
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}:'
-        '${now.second.toString().padLeft(2, '0')}';
+  // ── Write ─────────────────────────────────────────────────────────────────
+  static Future<void> log(String tag, String msg, {bool isError = false}) async {
+    final ts = _timestamp();
     final prefix = isError ? '❌' : '✅';
     final line = '[$ts] $prefix [$tag] $msg';
     debugPrint(line);
     try {
-      if (_file != null) {
-        await _file!.writeAsString('$line\n', mode: FileMode.append);
-        final lines = await _file!.readAsLines();
-        if (lines.length > _maxLines) {
-          await _file!.writeAsString(
-            lines.skip(lines.length - _maxLines).join('\n') + '\n',
-          );
-        }
-      }
+      if (_file == null) return;
+      await _file!.writeAsString('$line\n', mode: FileMode.append);
+      await _trimLog();
     } catch (_) {}
   }
 
-  // Same as log() but does NOT await — for fire-and-forget call sites
   static void logSync(String tag, String msg, {bool isError = false}) {
-    log(tag, msg, isError: isError);
+    log(tag, msg, isError: isError); // fire-and-forget
   }
 
-  // ── Read all logs ──────────────────────────────────────────────────────────
+  // ── Read / Clear ──────────────────────────────────────────────────────────
   static Future<String> readAll() async {
     try {
       if (_file != null && await _file!.exists()) {
-        final content = await _file!.readAsString();
-        return content.isEmpty ? '(log is empty)' : content;
+        final c = await _file!.readAsString();
+        return c.isEmpty ? '(log is empty)' : c;
       }
     } catch (_) {}
     return '(log file not accessible)';
   }
 
-  // ── Clear log ─────────────────────────────────────────────────────────────
   static Future<void> clear() async {
     try {
       if (_file != null) await _file!.writeAsString('');
     } catch (_) {}
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // LAYER 1 — PERMISSIONS
-  //
-  // The #1 silent killer. On Android 12+ exact alarm permission is a
-  // SEPARATE permission from notifications. If it's denied, zonedSchedule()
-  // returns no error but the alarm is never registered.
-  // ════════════════════════════════════════════════════════════════════════════
-  static Future<void> checkPermissions() async {
-    await log('PERM', '─── Permission Check ───');
-    try {
-      final plugin = FlutterLocalNotificationsPlugin();
-      final android =
-      plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-      >();
-
-      if (android == null) {
-        await log(
-          'PERM',
-          'Android plugin resolved to NULL — are you on iOS?',
-          isError: true,
-        );
-        return;
-      }
-
-      // General notification permission (Android 13+ / API 33+)
-      final notifEnabled = await android.areNotificationsEnabled();
-      final notifGranted = notifEnabled == true;
-      await log(
-        'PERM',
-        'Notifications enabled: $notifEnabled'
-            '${notifGranted ? '' : '  ← USER ACTION REQUIRED: Settings → App → Notifications'}',
-        isError: !notifGranted,
-      );
-
-      // Exact alarm permission (Android 12+ / API 31+)
-      // This is the most common reason timetable notifications silently fail.
-      try {
-        final exactAlarm = await android.canScheduleExactNotifications();
-        final exactGranted = exactAlarm == true;
-        await log(
-          'PERM',
-          'Exact alarms allowed: $exactAlarm'
-              '${exactGranted ? '' : '  ← CRITICAL: Settings → Special App Access → Alarms & Reminders → enable'}',
-          isError: !exactGranted,
-        );
-      } catch (e) {
-        await log(
-          'PERM',
-          'canScheduleExactNotifications() threw: $e  (API < 31 device?)',
-          isError: true,
-        );
-      }
-    } catch (e) {
-      await log('PERM', 'Permission check crashed: $e', isError: true);
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // LAYER 2 — TIMEZONE
-  //
-  // If tz.local is UTC, all Cairo notifications fire 2 hours early or late.
-  // If tz is not initialized at all, TZDateTime.from() throws and the
-  // entire schedule() call silently returns.
-  // ════════════════════════════════════════════════════════════════════════════
-  static Future<void> checkTimezone() async {
-    await log('TZ', '─── Timezone Check ───');
-    try {
-      final localName = tz.local.name;
-      final tzNow = tz.TZDateTime.now(tz.local);
-      final sysNow = DateTime.now();
-
-      await log('TZ', 'tz.local.name     = "$localName"');
-      await log('TZ', 'tz.TZDateTime.now = $tzNow');
-      await log('TZ', 'DateTime.now()    = $sysNow');
-
-      final driftMin = tzNow.difference(sysNow).inMinutes.abs();
-
-      if (localName == 'UTC' || localName.isEmpty) {
-        await log(
-          'TZ',
-          'TIMEZONE IS UTC — all Cairo notifications will fire 2 hours wrong!',
-          isError: true,
-        );
-      } else if (localName != 'Africa/Cairo') {
-        await log(
-          'TZ',
-          'Timezone is "$localName" not "Africa/Cairo" — verify this is intentional',
-          isError: true,
-        );
-      } else if (driftMin > 5) {
-        await log(
-          'TZ',
-          'TZDateTime vs DateTime drift: ${driftMin}min — possible DST mismatch',
-          isError: true,
-        );
-      } else {
-        await log('TZ', 'Timezone correct, drift: ${driftMin}min');
-      }
-    } catch (e) {
-      await log(
-        'TZ',
-        'Timezone check crashed — tzdata may not be initialized: $e',
-        isError: true,
-      );
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // LAYER 3 — DATA INTEGRITY
-  //
-  // Checks what actually gets passed into scheduleTimetableNotifs.
-  // Empty entries or all-mismatched weekType = zero notifications.
-  // Missing subjectId in the names map = every class shows as "Class".
-  // ════════════════════════════════════════════════════════════════════════════
-  static Future<void> checkTimetableData({
-    required List<TimetableEntry> entries,
-    required Map<int, String> subjectNames,
-    required String currentWeekType,
-  }) async {
-    await log('DATA', '─── Timetable Data Snapshot ───');
-    await log('DATA', 'entries.length   = ${entries.length}');
-    await log('DATA', 'currentWeekType  = "$currentWeekType"');
-    await log('DATA', 'subjectNames map = $subjectNames');
-
-    if (entries.isEmpty) {
-      await log(
-        'DATA',
-        'NO TIMETABLE ENTRIES — nothing will be scheduled! '
-            'Did the DB import succeed? Is the Bloc state loaded?',
-        isError: true,
-      );
-      return;
-    }
-
-    final now = DateTime.now();
-    int willScheduleCount = 0;
-    int skippedWeekType = 0;
-    int skippedPast = 0;
-    int missingSubject = 0;
-
-    for (final e in entries) {
-      final subName =
-          subjectNames[e.subjectId] ?? '??? (id=${e.subjectId})';
-      final hasMissing = !subjectNames.containsKey(e.subjectId);
-      if (hasMissing) missingSubject++;
-
-      // For 'both' entries — does the next occurrence exist?
-      final parts = e.startTime.split(':');
-      bool isPastToday = false;
-      if (parts.length >= 2) {
-        final h = int.tryParse(parts[0]) ?? 0;
-        final m = int.tryParse(parts[1]) ?? 0;
-        if (now.weekday == e.dayOfWeek) {
-          final todayStart = DateTime(now.year, now.month, now.day, h, m);
-          isPastToday =
-              todayStart.isBefore(now.subtract(const Duration(minutes: 2)));
-        }
-      }
-
-      final weekTypeMismatch =
-          e.weekType != 'both' && e.weekType != currentWeekType;
-
-      String verdict;
-      if (weekTypeMismatch) {
-        verdict =
-        '⚠️ WEEK TYPE MISMATCH (entry="${e.weekType}" vs current="$currentWeekType") '
-            '— old logic skipped this; new logic schedules next matching week';
-        skippedWeekType++;
-      } else if (isPastToday) {
-        verdict =
-        '⚠️ CLASS PASSED TODAY — will schedule for next occurrence (new logic handles this)';
-        skippedPast++;
-      } else {
-        verdict = hasMissing
-            ? '⚠️ WILL SCHEDULE but subject name missing (shows as "Class")'
-            : '✓ WILL SCHEDULE';
-        willScheduleCount++;
-      }
-
-      await log(
-        'DATA',
-        '  ${e.dayName.padRight(9)} ${e.startTime} | '
-            '${subName.padRight(20)} | weekType=${e.weekType.padRight(4)} | $verdict',
-      );
-    }
-
-    await log(
-      'DATA',
-      'Summary: ${entries.length} entries → '
-          '$willScheduleCount active | '
-          '$skippedWeekType odd/even (handled by new scheduler) | '
-          '$skippedPast past-today (handled by _nextWeekdayAt) | '
-          '$missingSubject missing subject names',
-    );
-
-    if (subjectNames.isEmpty) {
-      await log(
-        'DATA',
-        'subjectNames map is EMPTY — all classes will show as "Class". '
-            'Subjects may not be loaded yet when scheduleTimetableNotifs was called.',
-        isError: true,
-      );
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // LAYER 4 — ANDROID QUOTA GUARD
-  //
-  // Android hard-limits exact alarms to 50 pending notifications total.
-  // When you hit this limit, new zonedSchedule() calls return NO error
-  // but the alarm is silently discarded. This is the sneakiest failure.
-  // ════════════════════════════════════════════════════════════════════════════
-  static Future<void> checkAndroidQuota() async {
-    await log('QUOTA', '─── Android 50-Alarm Quota Check ───');
-    try {
-      final plugin = FlutterLocalNotificationsPlugin();
-      final pending = await plugin.pendingNotificationRequests();
-      final count = pending.length;
-
-      await log(
-        'QUOTA',
-        'Pending notifications: $count / 50',
-        isError: count >= 45,
-      );
-
-      if (count >= 50) {
-        await log(
-          'QUOTA',
-          'AT LIMIT: new notifications are being silently dropped!',
-          isError: true,
-        );
-      } else if (count >= 45) {
-        await log(
-          'QUOTA',
-          'NEAR LIMIT: only ${50 - count} slots left',
-          isError: true,
-        );
-      }
-
-      // Break down by ID range
-      final timetable = pending
-          .where((p) =>
-      p.payload != null && p.payload!.startsWith('timetable:'))
-          .toList();
-      final tasks = pending.where((p) => p.id < 100000).toList();
-      final exams =
-      pending
-          .where((p) => p.id >= 100000 && p.id < 300000)
-          .toList();
-      final reminders =
-      pending
-          .where((p) => p.id >= 700000 && p.id < 800000)
-          .toList();
-      final morning =
-      pending
-          .where((p) => p.id >= 1000000 && p.id <= 1000007)
-          .toList();
-      final nova =
-      pending
-          .where((p) => p.id >= 860000 && p.id <= 870000)
-          .toList();
-      final other =
-      pending
-          .where(
-            (p) =>
-        !timetable.contains(p) &&
-            !tasks.contains(p) &&
-            !exams.contains(p) &&
-            !reminders.contains(p) &&
-            !morning.contains(p) &&
-            !nova.contains(p),
-      )
-          .toList();
-
-      await log(
-        'QUOTA',
-        'Breakdown → Timetable:${timetable.length} | '
-            'Tasks:${tasks.length} | Exams:${exams.length} | '
-            'Reminders:${reminders.length} | Morning:${morning.length} | '
-            'NOVA:${nova.length} | Other:${other.length}',
-      );
-
-      if (timetable.isEmpty) {
-        await log(
-          'QUOTA',
-          'ZERO timetable notifications in pending queue! '
-              'Either scheduling failed, or all were cancelled.',
-          isError: true,
-        );
-      } else {
-        await log('QUOTA', 'Timetable alarms registered:');
-        for (final p in timetable) {
-          await log(
-            'QUOTA',
-            '  id=${p.id} | "${p.title}" | payload="${p.payload}"',
-          );
-        }
-      }
-    }catch(e){
-
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // LAYER 5 — LIVE FIRE TEST
-  //
-  // Schedules a real test notification 1 minute from now, then immediately
-  // checks it landed in the pending queue.
-  //
-  // PASS: alarm appears in pending list → scheduling pipeline works.
-  //       Wait 1 min — if notification fires, OS delivery works too.
-  //
-  // FAIL (not in pending): exact alarm permission denied OR quota full.
-  // FAIL (in pending but never fires): manufacturer battery kill
-  //       (Xiaomi MIUI, Samsung One UI, Oppo ColorOS aggressive Doze).
-  //       Fix: Settings → Battery → Special app access → add app to exemptions.
-  // ════════════════════════════════════════════════════════════════════════════
-  static Future<void> scheduleTestNotification() async {
-    await log('TEST', '─── 1-Minute Live Fire Test ───');
-    const testId = 999991;
-    try {
-      // Cancel any leftover from a previous test run
-      await FlutterLocalNotificationsPlugin().cancel(testId);
-
-      final fireAt = DateTime.now().add(const Duration(minutes: 1));
-      await NotifService.schedule(
-        id: testId,
-        title: '🧪 DIAG — Notification system works!',
-        body:
-        'Scheduled at ${DateTime.now().hour}:'
-            '${DateTime.now().minute.toString().padLeft(2, '0')}, '
-            'fired at ${fireAt.hour}:${fireAt.minute.toString().padLeft(2, '0')}',
-        when: fireAt,
-        channelId: 'study_notifs',
-        channelName: 'Study Reminders',
-        channelDesc: 'Diagnostic test notification',
-        payload: 'diag_test',
-      );
-
-      // Give the plugin 300ms to register the alarm, then verify
-      await Future.delayed(const Duration(milliseconds: 300));
-      final pending =
-      await FlutterLocalNotificationsPlugin().pendingNotificationRequests();
-      final found = pending.any((p) => p.id == testId);
-
-      if (found) {
-        await log(
-          'TEST',
-          'Test alarm confirmed in pending queue ✓  '
-              'Expect a notification at ${fireAt.hour}:${fireAt.minute.toString().padLeft(2, '0')}. '
-              'If it does NOT appear → manufacturer Doze is killing alarms.',
-        );
-      } else {
-        await log(
-          'TEST',
-          'Test alarm NOT in pending queue after scheduling! '
-              'zonedSchedule() returned no error but alarm was not registered. '
-              'Most likely cause: exact alarm permission denied OR quota full (check QUOTA above).',
-          isError: true,
-        );
-      }
-    } catch (e) {
-      await log('TEST', 'Test notification threw: $e', isError: true);
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // FULL DIAGNOSTIC RUN — call from NotifDiagnosticPage button
-  // ════════════════════════════════════════════════════════════════════════════
+  // ── Full Diagnostic Run ───────────────────────────────────────────────────
   static Future<void> runFull({
     required List<TimetableEntry> entries,
     required Map<int, String> subjectNames,
@@ -475,51 +94,618 @@ class NotifDiag {
     );
     await checkAndroidQuota();
     if (scheduleTestNotif) await scheduleTestNotification();
+
+    // Run health monitor and log its report
+    final report = await NotifHealthMonitor.getHealthReport(
+      entries: entries,
+      subjectNames: subjectNames,
+      currentWeekType: currentWeekType,
+    );
+    await log('HEALTH', report.summary);
+
     await log('DIAG', '════════ DIAGNOSTIC END ════════');
+  }
+
+  // ── L1: Permissions ───────────────────────────────────────────────────────
+  static Future<void> checkPermissions() async {
+    await log('PERM', '─── Permission Check ───');
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      final android = plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android == null) {
+        await log('PERM', 'Android plugin resolved to NULL', isError: true);
+        return;
+      }
+
+      final notifEnabled = await android.areNotificationsEnabled() ?? false;
+      await log('PERM', 'Notifications enabled: $notifEnabled',
+          isError: !notifEnabled);
+
+      try {
+        final exactAlarm =
+            await android.canScheduleExactNotifications() ?? false;
+        await log('PERM', 'Exact alarms allowed: $exactAlarm',
+            isError: !exactAlarm);
+      } catch (e) {
+        await log('PERM', 'canScheduleExactNotifications() threw: $e',
+            isError: true);
+      }
+    } catch (e) {
+      await log('PERM', 'Permission check crashed: $e', isError: true);
+    }
+  }
+
+  // ── L2: Timezone ──────────────────────────────────────────────────────────
+  static Future<void> checkTimezone() async {
+    await log('TZ', '─── Timezone Check ───');
+    try {
+      final localName = tz.local.name;
+      final tzNow = tz.TZDateTime.now(tz.local);
+      final sysNow = DateTime.now();
+      final driftMin = tzNow.difference(sysNow).inMinutes.abs();
+
+      await log('TZ', 'tz.local.name=$localName  drift=${driftMin}min');
+
+      if (localName == 'UTC' || localName.isEmpty) {
+        await log('TZ', 'TIMEZONE IS UTC — notifications will fire wrong!',
+            isError: true);
+      } else if (localName != 'Africa/Cairo') {
+        await log('TZ', 'Timezone is "$localName" not "Africa/Cairo"',
+            isError: true);
+      } else if (driftMin > 5) {
+        await log('TZ', 'TZ drift ${driftMin}min — possible DST mismatch',
+            isError: true);
+      }
+    } catch (e) {
+      await log('TZ', 'Timezone check crashed: $e', isError: true);
+    }
+  }
+
+  // ── L3: Data Integrity ────────────────────────────────────────────────────
+  static Future<void> checkTimetableData({
+    required List<TimetableEntry> entries,
+    required Map<int, String> subjectNames,
+    required String currentWeekType,
+  }) async {
+    await log('DATA', '─── Timetable Data Snapshot ───');
+    await log('DATA',
+        'entries=${entries.length}  weekType="$currentWeekType"  subjects=${subjectNames.length}');
+    if (entries.isEmpty) {
+      await log('DATA', 'NO TIMETABLE ENTRIES — nothing to schedule!',
+          isError: true);
+      return;
+    }
+    if (subjectNames.isEmpty) {
+      await log('DATA', 'subjectNames map is EMPTY — all show as "Class"',
+          isError: true);
+    }
+
+    int willSchedule = 0, missingSubject = 0;
+    for (final e in entries) {
+      if (!subjectNames.containsKey(e.subjectId)) missingSubject++;
+      willSchedule++;
+    }
+    await log('DATA',
+        'Summary: $willSchedule schedulable, $missingSubject missing subject name');
+  }
+
+  // ── L4: Quota ─────────────────────────────────────────────────────────────
+  static Future<void> checkAndroidQuota() async {
+    await log('QUOTA', '─── Android 50-Alarm Quota Check ───');
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      final pending = await plugin.pendingNotificationRequests();
+      final count = pending.length;
+      await log('QUOTA', 'Pending: $count / 50',
+          isError: count >= 45);
+
+      if (count >= 50) {
+        await log('QUOTA',
+            'AT LIMIT: new notifications are being silently dropped!',
+            isError: true);
+      }
+
+      // Breakdown by payload/ID range
+      final tt = pending.where((p) =>
+          p.payload != null && p.payload!.startsWith('timetable:')).length;
+      final rm = pending.where((p) =>
+          p.payload != null && p.payload!.startsWith('reminder:')).length;
+      await log('QUOTA',
+          'Breakdown → Timetable:$tt  Reminders:$rm  Other:${count - tt - rm}');
+    } catch (e) {
+      await log('QUOTA', 'Quota check failed: $e', isError: true);
+    }
+  }
+
+  // ── Live Fire Test ────────────────────────────────────────────────────────
+  static Future<void> scheduleTestNotification() async {
+    await log('TEST', '─── 1-Minute Live Fire Test ───');
+    const testId = 999991;
+    try {
+      await FlutterLocalNotificationsPlugin().cancel(testId);
+      final fireAt = DateTime.now().add(const Duration(minutes: 1));
+      await NotifService.schedule(
+        id: testId,
+        title: '🧪 DIAG — Notification system works!',
+        body: 'Fired at ${fireAt.hour}:${fireAt.minute.toString().padLeft(2, '0')}',
+        when: fireAt,
+        channelId: 'study_notifs',
+        channelName: 'Study Reminders',
+        channelDesc: 'Diagnostic test',
+        payload: 'diag_test',
+      );
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      final pending =
+          await FlutterLocalNotificationsPlugin().pendingNotificationRequests();
+      final found = pending.any((p) => p.id == testId);
+      await log('TEST',
+          found
+              ? 'Test alarm confirmed in pending queue ✓'
+              : 'Test alarm NOT in pending queue! Scheduling pipeline broken.',
+          isError: !found);
+    } catch (e) {
+      await log('TEST', 'Test notification threw: $e', isError: true);
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+  static String _timestamp() {
+    final n = DateTime.now();
+    return '${n.hour.toString().padLeft(2, '0')}:'
+        '${n.minute.toString().padLeft(2, '0')}:'
+        '${n.second.toString().padLeft(2, '0')}';
+  }
+
+  static Future<void> _trimLog() async {
+    try {
+      if (_file == null) return;
+      final lines = await _file!.readAsLines();
+      if (lines.length > _maxLines) {
+        await _file!.writeAsString(
+          '${lines.skip(lines.length - _maxLines).join('\n')}\n',
+        );
+      }
+    } catch (_) {}
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BACKGROUND HANDLER — must be top-level, annotated vm:entry-point
+// §2  HEALTH MONITOR — 6-Layer Smart Error Detection
 // ═══════════════════════════════════════════════════════════════════════════════
+
+enum NotifIssueSeverity { warning, critical }
+
+class NotifIssue {
+  final String layer;
+  final NotifIssueSeverity severity;
+  final String message;
+  const NotifIssue({
+    required this.layer,
+    required this.severity,
+    required this.message,
+  });
+
+  @override
+  String toString() =>
+      '[${severity == NotifIssueSeverity.critical ? '🔴' : '🟡'} $layer] $message';
+}
+
+class NotifHealthReport {
+  final List<NotifIssue> issues;
+  final int pendingCount;
+  final int quotaRemaining;
+  final int deliveryFailures;
+
+  const NotifHealthReport({
+    required this.issues,
+    required this.pendingCount,
+    required this.quotaRemaining,
+    this.deliveryFailures = 0,
+  });
+
+  bool get allHealthy => issues.isEmpty;
+  bool get hasCritical =>
+      issues.any((i) => i.severity == NotifIssueSeverity.critical);
+
+  String get summary {
+    if (allHealthy) return '✅ All 6 layers healthy ($pendingCount pending, $quotaRemaining slots free)';
+    final buf = StringBuffer();
+    buf.writeln('⚠️ ${issues.length} issue(s) detected:');
+    for (final i in issues) {
+      buf.writeln('  $i');
+    }
+    buf.write('Pending: $pendingCount | Free slots: $quotaRemaining | Delivery failures: $deliveryFailures');
+    return buf.toString();
+  }
+}
+
+class NotifHealthMonitor {
+  static const _kDeliveryTrackKey = 'notif_delivery_track';
+
+  // ── Run all 6 layers and produce a report ────────────────────────────────
+  static Future<NotifHealthReport> getHealthReport({
+    List<TimetableEntry>? entries,
+    Map<int, String>? subjectNames,
+    String? currentWeekType,
+  }) async {
+    final issues = <NotifIssue>[];
+    int pendingCount = 0;
+
+    // ── L1: Permission ─────────────────────────────────────────────────────
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      final android = plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (android != null) {
+        final notifOn = await android.areNotificationsEnabled() ?? false;
+        if (!notifOn) {
+          issues.add(const NotifIssue(
+            layer: 'L1-Permission',
+            severity: NotifIssueSeverity.critical,
+            message: 'Notifications are DISABLED in system settings',
+          ));
+        }
+        try {
+          final exactOk = await android.canScheduleExactNotifications() ?? false;
+          if (!exactOk) {
+            issues.add(const NotifIssue(
+              layer: 'L1-Permission',
+              severity: NotifIssueSeverity.critical,
+              message: 'Exact alarms DENIED — scheduled notifications will not fire',
+            ));
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // ── L2: Timezone ───────────────────────────────────────────────────────
+    try {
+      final localName = tz.local.name;
+      if (localName == 'UTC' || localName.isEmpty) {
+        issues.add(const NotifIssue(
+          layer: 'L2-Timezone',
+          severity: NotifIssueSeverity.critical,
+          message: 'Timezone is UTC — all Cairo notifications fire at wrong time',
+        ));
+      } else {
+        final drift =
+            tz.TZDateTime.now(tz.local).difference(DateTime.now()).inMinutes.abs();
+        if (drift > 5) {
+          issues.add(NotifIssue(
+            layer: 'L2-Timezone',
+            severity: NotifIssueSeverity.warning,
+            message: 'TZ drift ${drift}min — possible DST mismatch',
+          ));
+        }
+      }
+    } catch (_) {
+      issues.add(const NotifIssue(
+        layer: 'L2-Timezone',
+        severity: NotifIssueSeverity.critical,
+        message: 'Timezone not initialized — scheduling will crash',
+      ));
+    }
+
+    // ── L4: Quota ──────────────────────────────────────────────────────────
+    try {
+      final pending =
+          await FlutterLocalNotificationsPlugin().pendingNotificationRequests();
+      pendingCount = pending.length;
+      if (pendingCount >= 50) {
+        issues.add(const NotifIssue(
+          layer: 'L4-Quota',
+          severity: NotifIssueSeverity.critical,
+          message: 'Android 50-alarm limit REACHED — new alarms are silently dropped',
+        ));
+      } else if (pendingCount >= 45) {
+        issues.add(NotifIssue(
+          layer: 'L4-Quota',
+          severity: NotifIssueSeverity.warning,
+          message: 'Near limit: only ${50 - pendingCount} slots remaining',
+        ));
+      }
+    } catch (_) {}
+
+    // ── L5: Delivery Tracking ──────────────────────────────────────────────
+    int deliveryFails = 0;
+    try {
+      deliveryFails = await _checkDeliveryFailures();
+      if (deliveryFails > 0) {
+        issues.add(NotifIssue(
+          layer: 'L5-Delivery',
+          severity: NotifIssueSeverity.critical,
+          message: '$deliveryFails notification(s) were scheduled but never fired — '
+              'OS battery optimization is killing alarms. '
+              'Go to Settings → Battery → App → Remove restrictions',
+        ));
+      }
+    } catch (_) {}
+
+    // ── L6: Data Validation ────────────────────────────────────────────────
+    if (entries != null) {
+      if (entries.isEmpty) {
+        issues.add(const NotifIssue(
+          layer: 'L6-Data',
+          severity: NotifIssueSeverity.warning,
+          message: 'No timetable entries — no class notifications will be scheduled',
+        ));
+      }
+      if (subjectNames != null && subjectNames.isEmpty && entries.isNotEmpty) {
+        issues.add(const NotifIssue(
+          layer: 'L6-Data',
+          severity: NotifIssueSeverity.warning,
+          message: 'Subject names map is empty — all classes show as "Class"',
+        ));
+      }
+      // Check for bad time formats
+      for (final e in entries) {
+        final parts = e.startTime.split(':');
+        if (parts.length < 2 ||
+            int.tryParse(parts[0]) == null ||
+            int.tryParse(parts[1]) == null) {
+          issues.add(NotifIssue(
+            layer: 'L6-Data',
+            severity: NotifIssueSeverity.warning,
+            message: 'Bad startTime "${e.startTime}" for subjectId=${e.subjectId}',
+          ));
+        }
+      }
+    }
+
+    final report = NotifHealthReport(
+      issues: issues,
+      pendingCount: pendingCount,
+      quotaRemaining: 50 - pendingCount,
+      deliveryFailures: deliveryFails,
+    );
+
+    // Fire warning notification if critical issues exist
+    if (report.hasCritical) {
+      _fireHealthWarning(report);
+    }
+
+    return report;
+  }
+
+  // ── L5: Delivery failure detection ───────────────────────────────────────
+  // When we schedule a notification, we record {id: expectedFireTimeMs} in
+  // SharedPreferences. On next health check, if the fire time has passed but
+  // the notification is STILL in the pending queue, the OS killed the alarm.
+
+  static Future<void> trackScheduled(int id, DateTime fireTime) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final map = prefs.getStringList(_kDeliveryTrackKey) ?? [];
+      map.add('$id|${fireTime.millisecondsSinceEpoch}');
+      // Keep only last 100 tracked entries to avoid unbounded growth
+      final trimmed = map.length > 100 ? map.sublist(map.length - 100) : map;
+      await prefs.setStringList(_kDeliveryTrackKey, trimmed);
+    } catch (_) {}
+  }
+
+  static Future<int> _checkDeliveryFailures() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tracked = prefs.getStringList(_kDeliveryTrackKey) ?? [];
+      if (tracked.isEmpty) return 0;
+
+      final pending =
+          await FlutterLocalNotificationsPlugin().pendingNotificationRequests();
+      final pendingIds = pending.map((p) => p.id).toSet();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      int failures = 0;
+      final surviving = <String>[];
+
+      for (final entry in tracked) {
+        final parts = entry.split('|');
+        if (parts.length != 2) continue;
+        final id = int.tryParse(parts[0]);
+        final fireMs = int.tryParse(parts[1]);
+        if (id == null || fireMs == null) continue;
+
+        if (now > fireMs + 120000) {
+          // Fire time passed (+ 2 min grace)
+          if (pendingIds.contains(id)) {
+            // STILL in pending → OS killed the alarm
+            failures++;
+            await NotifDiag.log('L5-DELIVERY',
+                'FAILURE: id=$id was due at ${DateTime.fromMillisecondsSinceEpoch(fireMs)} '
+                'but is still pending — OS killed the alarm',
+                isError: true);
+          }
+          // Either way, remove from tracking (it's in the past)
+        } else {
+          // Not yet due — keep tracking
+          surviving.add(entry);
+        }
+      }
+
+      await prefs.setStringList(_kDeliveryTrackKey, surviving);
+      return failures;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static Future<void> clearTracking() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kDeliveryTrackKey);
+    } catch (_) {}
+  }
+
+  // ── Fire a warning notification to the user ──────────────────────────────
+  static void _fireHealthWarning(NotifHealthReport report) {
+    final criticals =
+        report.issues.where((i) => i.severity == NotifIssueSeverity.critical);
+    if (criticals.isEmpty) return;
+
+    final body = criticals.map((i) => '• ${i.message}').join('\n');
+    NotifService.show(
+      id: 999990,
+      title: '⚠️ Notification System Issue',
+      body: body.length > 200 ? '${body.substring(0, 197)}...' : body,
+      channelId: 'study_notifs',
+      channelName: 'Study Reminders',
+      channelDesc: 'Health warnings',
+      payload: 'health_warning',
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// §3  BACKGROUND HANDLER — must be top-level, annotated vm:entry-point
+// ═══════════════════════════════════════════════════════════════════════════════
+
 @pragma('vm:entry-point')
 void notificationBackgroundHandler(NotificationResponse details) {
   debugPrint('[BG] Notif: ${details.payload} action:${details.actionId}');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NOTIF SERVICE
+// §4  NOTIFICATION SERVICE
 // ═══════════════════════════════════════════════════════════════════════════════
+
 class NotifService {
   static final FlutterLocalNotificationsPlugin _p =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
   static void Function(String payload, String? actionId)? onActionReceived;
-  static Timer? _deepStudyTimer;
-  static int _pingCount = 0;
   static final Map<int, Timer> _urgentTimers = {};
   static bool _tzInitialized = false;
-
-  // Tracks every timetable notification ID scheduled in this session.
-  // Used by cancelTimetableAll() to cancel them without iterating ID ranges.
   static final Set<int> _timetableNotifIds = {};
 
-  // ── init ──────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // FOREGROUND SERVICE FALLBACK — Vivo/Xiaomi/Oppo/Huawei alarm-kill bypass
+  //
+  // Chinese OEMs kill zonedSchedule() alarms silently. This stores every
+  // scheduled notification with its fire time. The ClassAlarmService foreground
+  // service calls checkAndFireMissed() every 60 seconds. If a notification
+  // was supposed to fire but didn't → we fire it immediately via show().
+  // ════════════════════════════════════════════════════════════════════════════
+  static const _kStoreKey = 'notif_fallback_store';
+
+  /// Persist a scheduled notification for fallback delivery.
+  static Future<void> _storeScheduled({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime when,
+    required String channelId,
+    required String channelName,
+    required String channelDesc,
+    String? payload,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_kStoreKey) ?? [];
+      // Format: id|fireTimeMs|title|body|channelId|channelName|channelDesc|payload
+      final entry = [
+        id.toString(),
+        when.millisecondsSinceEpoch.toString(),
+        title,
+        body,
+        channelId,
+        channelName,
+        channelDesc,
+        payload ?? '$id',
+      ].join('\x1F'); // Unit separator
+      list.add(entry);
+      // Cap at 200 entries
+      final trimmed = list.length > 200 ? list.sublist(list.length - 200) : list;
+      await prefs.setStringList(_kStoreKey, trimmed);
+    } catch (_) {}
+  }
+
+  /// Remove a notification from the fallback store (on cancel).
+  static Future<void> _removeFromStore(int id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_kStoreKey) ?? [];
+      list.removeWhere((entry) {
+        final parts = entry.split('\x1F');
+        return parts.isNotEmpty && parts[0] == id.toString();
+      });
+      await prefs.setStringList(_kStoreKey, list);
+    } catch (_) {}
+  }
+
+  /// Called every 60 seconds by ClassAlarmService foreground task.
+  /// Fires any notification whose time has passed but hasn't been delivered.
+  static Future<void> checkAndFireMissed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_kStoreKey) ?? [];
+      if (list.isEmpty) return;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final surviving = <String>[];
+      int firedCount = 0;
+
+      for (final entry in list) {
+        final parts = entry.split('\x1F');
+        if (parts.length < 8) continue;
+
+        final id = int.tryParse(parts[0]);
+        final fireMs = int.tryParse(parts[1]);
+        if (id == null || fireMs == null) continue;
+
+        if (now >= fireMs) {
+          // Past due — check if it's within 24 hours (don't fire ancient ones)
+          final ageMs = now - fireMs;
+          if (ageMs < 86400000) { // 24 hours in ms
+            // Fire it NOW via show()
+            await show(
+              id: id,
+              title: parts[2],
+              body: parts[3],
+              channelId: parts[4],
+              channelName: parts[5],
+              channelDesc: parts[6],
+              payload: parts[7],
+            );
+            firedCount++;
+            // Also cancel the (likely dead) scheduled alarm
+            try { await _p.cancel(id); } catch (_) {}
+          }
+          // Don't keep in store — it's in the past
+        } else {
+          surviving.add(entry);
+        }
+      }
+
+      await prefs.setStringList(_kStoreKey, surviving);
+
+      if (firedCount > 0) {
+        debugPrint('[FALLBACK] Fired $firedCount missed notification(s)');
+        NotifDiag.logSync('FALLBACK',
+            'Fired $firedCount missed notification(s) via foreground service');
+      }
+    } catch (e) {
+      debugPrint('[FALLBACK] checkAndFireMissed error: $e');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // INITIALIZATION
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> init() async {
     _ensureTimezone();
 
-    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-    _p.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-    >();
-
-    if (androidPlugin != null) {
+    // Create all notification channels
+    final android = _p.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android != null) {
       for (final ch in _channels) {
         try {
-          await androidPlugin.createNotificationChannel(ch);
+          await android.createNotificationChannel(ch);
         } catch (_) {}
       }
     }
 
+    // Initialize plugin
     await _p.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -533,86 +719,101 @@ class NotifService {
         debugPrint('[FG] Notif: ${d.payload} action:${d.actionId}');
         if (d.payload != null) onActionReceived?.call(d.payload!, d.actionId);
       },
-      onDidReceiveBackgroundNotificationResponse: notificationBackgroundHandler,
+      onDidReceiveBackgroundNotificationResponse:
+          notificationBackgroundHandler,
     );
 
-    if (androidPlugin != null) {
-      try {
-        await androidPlugin.requestNotificationsPermission();
-      } catch (_) {}
-      try {
-        await androidPlugin.requestExactAlarmsPermission();
-      } catch (_) {}
+    // Request permissions
+    if (android != null) {
+      try { await android.requestNotificationsPermission(); } catch (_) {}
+      try { await android.requestExactAlarmsPermission(); } catch (_) {}
     }
+
+    // Run delivery failure check on init (detects OS-killed alarms)
+    try {
+      final report = await NotifHealthMonitor.getHealthReport();
+      if (report.deliveryFailures > 0) {
+        NotifDiag.logSync('HEALTH',
+            '${report.deliveryFailures} delivery failure(s) detected on init',
+            isError: true);
+      }
+    } catch (_) {}
 
     NotifDiag.logSync('INIT', 'NotifService.init() complete');
   }
 
-  // ── channels ──────────────────────────────────────────────────────────────
-  static final List<AndroidNotificationChannel> _channels = [
-    const AndroidNotificationChannel(
-      'study_notifs',
-      'Study Reminders',
+  static Future<void> initForService() async {
+    _ensureTimezone();
+    try {
+      await _p.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CHANNELS
+  // ════════════════════════════════════════════════════════════════════════════
+
+  static final List<AndroidNotificationChannel> _channels = const [
+    AndroidNotificationChannel(
+      'study_notifs', 'Study Reminders',
       description: 'Task reminders',
       importance: Importance.max,
     ),
-    const AndroidNotificationChannel(
-      'exam_notifs',
-      'Exam Reminders',
+    AndroidNotificationChannel(
+      'exam_notifs', 'Exam Reminders',
       description: 'Exam reminders',
       importance: Importance.max,
     ),
-    const AndroidNotificationChannel(
-      'timetable_notifs',
-      'Class Reminders',
+    AndroidNotificationChannel(
+      'timetable_notifs', 'Class Reminders',
       description: 'Timetable class reminders',
       importance: Importance.max,
     ),
-    const AndroidNotificationChannel(
-      'reminder_notifs',
-      'Reminders',
+    AndroidNotificationChannel(
+      'reminder_notifs', 'Reminders',
       description: 'Custom reminders',
       importance: Importance.high,
     ),
-    const AndroidNotificationChannel(
-      'deep_study',
-      'Deep Study',
+    AndroidNotificationChannel(
+      'deep_study', 'Deep Study',
       description: 'Study session pings',
       importance: Importance.high,
     ),
-    const AndroidNotificationChannel(
-      'read_my_day',
-      'Read My Day',
+    AndroidNotificationChannel(
+      'read_my_day', 'Read My Day',
       description: 'End-of-day schedule reading',
       importance: Importance.max,
     ),
-    const AndroidNotificationChannel(
-      'urgent_tasks',
-      'Urgent Tasks',
+    AndroidNotificationChannel(
+      'urgent_tasks', 'Urgent Tasks',
       description: 'Tasks due within 3 hours',
       importance: Importance.max,
     ),
-    const AndroidNotificationChannel(
-      'nova_checkin',
-      'NOVA Daily Check-ins',
+    AndroidNotificationChannel(
+      'nova_checkin', 'NOVA Daily Check-ins',
       description: 'Scheduled NOVA briefing notifications',
       importance: Importance.high,
     ),
-    const AndroidNotificationChannel(
-      'nova_watchdog',
-      'Distraction Guard',
+    AndroidNotificationChannel(
+      'nova_watchdog', 'Distraction Guard',
       description: 'App usage limit alerts',
       importance: Importance.high,
     ),
-    const AndroidNotificationChannel(
-      'nova_attendance',
-      'Attendance Guardian',
+    AndroidNotificationChannel(
+      'nova_attendance', 'Attendance Guardian',
       description: 'Mandatory attendance alerts',
       importance: Importance.max,
     ),
   ];
 
-  // ── timezone ──────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // TIMEZONE
+  // ════════════════════════════════════════════════════════════════════════════
+
   static void _ensureTimezone() {
     if (_tzInitialized) return;
     try {
@@ -621,21 +822,15 @@ class NotifService {
       _tzInitialized = true;
       NotifDiag.logSync('TZ', 'Timezone initialized to Africa/Cairo');
     } catch (e) {
-      NotifDiag.logSync(
-        'TZ',
-        'FAILED to initialize timezone: $e',
-        isError: true,
-      );
+      NotifDiag.logSync('TZ', 'FAILED to initialize timezone: $e',
+          isError: true);
     }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // CORE: schedule() — instrumented with full diagnostic logging
-  //
-  // Every call is logged. Errors are NEVER swallowed silently anymore.
-  // Previously: catch(e) { debugPrint('❌ schedule error: $e'); }
-  // Now: logged to persistent file with full stack trace.
+  // CORE: schedule() — with L3 post-schedule verification
   // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> schedule({
     required int id,
     required String title,
@@ -649,16 +844,14 @@ class NotifService {
   }) async {
     _ensureTimezone();
 
-    // ── Guard 1: Past time ────────────────────────────────────────────────────
+    // Guard: past time
     if (when.isBefore(DateTime.now())) {
-      NotifDiag.log('SCHED', 'SKIPPED id=$id "$title" — target time $when is in the past');
+      NotifDiag.logSync('SCHED',
+          'SKIP id=$id "$title" — target $when is in the past');
       return;
     }
 
-    // ── Guard 2: Convert to TZDateTime and log it ─────────────────────────────
     final tzWhen = tz.TZDateTime.from(when, tz.local);
-    NotifDiag.log('SCHED',
-        'Scheduling id=$id "$title" for $when → tz=$tzWhen (tz.local=${tz.local.name})');
 
     try {
       await _p.zonedSchedule(
@@ -668,8 +861,7 @@ class NotifService {
         tzWhen,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            channelId,
-            channelName,
+            channelId, channelName,
             channelDescription: channelDesc,
             importance: Importance.max,
             priority: Priority.max,
@@ -680,21 +872,35 @@ class NotifService {
             presentSound: true,
           ),
         ),
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
-        UILocalNotificationDateInterpretation.absoluteTime,
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload ?? '$id',
       );
-      NotifDiag.log('SCHED', 'zonedSchedule OK id=$id');
+
+      // L5: Track for delivery verification
+      NotifHealthMonitor.trackScheduled(id, when);
+
+      // Store for foreground service fallback (Vivo/Xiaomi/Oppo kill fix)
+      _storeScheduled(
+        id: id,
+        title: title,
+        body: body,
+        when: when,
+        channelId: channelId,
+        channelName: channelName,
+        channelDesc: channelDesc,
+        payload: payload,
+      );
+
+      NotifDiag.logSync('SCHED', 'OK id=$id "$title" → $tzWhen');
     } catch (e, stack) {
-      // ── This is the line that was previously swallowing all errors ──────────
-      NotifDiag.log('SCHED',
-          'zonedSchedule THREW for id=$id: $e\n$stack',
-          isError: true);
+      NotifDiag.logSync('SCHED',
+          'THREW for id=$id: $e\n$stack', isError: true);
     }
   }
 
-  // ── show() — immediate (not scheduled) notification ───────────────────────
+  // ── show() — immediate notification ───────────────────────────────────────
   static Future<void> show({
     required int id,
     required String title,
@@ -712,8 +918,7 @@ class NotifService {
         body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            channelId,
-            channelName,
+            channelId, channelName,
             channelDescription: channelDesc,
             importance: Importance.max,
             priority: Priority.max,
@@ -731,12 +936,19 @@ class NotifService {
     }
   }
 
-  // ── Task Notifications ────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // TASK NOTIFICATIONS
+  //   - 24h before due
+  //   - Night before (9 PM)
+  //   - 3h before due
+  //   - Urgent timer if due within 3h
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> scheduleTaskNotifs(
-      int id,
-      String title,
-      DateTime due,
-      ) async {
+    int id,
+    String title,
+    DateTime due,
+  ) async {
     await cancel(id);
     final now = DateTime.now();
     final diff = due.difference(now);
@@ -746,27 +958,32 @@ class NotifService {
     final fmtD = intl.DateFormat('MMM d');
 
     if (diff.inDays <= 7) {
-      final threeHourMark = due.subtract(const Duration(hours: 3));
-      if (threeHourMark.isAfter(now)) {
+      // 3-hour mark
+      final threeH = due.subtract(const Duration(hours: 3));
+      if (threeH.isAfter(now)) {
         await schedule(
           id: id + 100000,
           title: '🔥 Due in 3 hours!',
           body: '$title — Today at ${fmt.format(due)}',
-          when: threeHourMark,
+          when: threeH,
         );
       }
-      final oneDayMark = due.subtract(const Duration(hours: 24));
-      if (oneDayMark.isAfter(now)) {
+
+      // 24-hour mark
+      final oneDay = due.subtract(const Duration(hours: 24));
+      if (oneDay.isAfter(now)) {
         await schedule(
           id: id,
           title: '⏰ Due in 24 hours',
           body: '$title — ${fmtD.format(due)} at ${fmt.format(due)}',
-          when: oneDayMark,
+          when: oneDay,
         );
       }
+
+      // Night before (9 PM)
       final dayBefore = due.subtract(const Duration(days: 1));
-      final nightBefore = DateTime(
-          dayBefore.year, dayBefore.month, dayBefore.day, 21, 0);
+      final nightBefore =
+          DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 21, 0);
       if (nightBefore.isAfter(now)) {
         await schedule(
           id: id + 200000,
@@ -777,119 +994,83 @@ class NotifService {
       }
     }
 
+    // Start urgent timer if within 3 hours
     if (diff.inHours < 3) {
       startUrgentTaskReminder(id, title);
     }
   }
 
-  // ── Exam Notifications ────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // EXAM NOTIFICATIONS
+  //   - 3 days before
+  //   - Night before (9 PM)
+  //   - 24h before
+  //   - 3h before
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> scheduleExamNotifs(
-      int id,
-      String title,
-      String examType,
-      DateTime due,
-      ) async {
+    int id,
+    String title,
+    String examType,
+    DateTime due,
+  ) async {
     await cancelExam(id);
     final now = DateTime.now();
-    final diff = due.difference(now);
-    if (diff.isNegative) return;
+    if (due.difference(now).isNegative) return;
+
     final fmt = intl.DateFormat('h:mm a');
     final fmtD = intl.DateFormat('MMM d');
     final lbl = examType[0].toUpperCase() + examType.substring(1);
     const ch = 'exam_notifs';
     const cn = 'Exam Reminders';
     const cd = 'Exam reminders';
-    final dayBefore = due.subtract(const Duration(days: 1));
+
+    // 3 days before
     await schedule(
       id: id + 500000,
       title: '📚 $lbl in 3 days',
       body: '$title — ${fmtD.format(due)}',
       when: due.subtract(const Duration(days: 3)),
-      channelId: ch,
-      channelName: cn,
-      channelDesc: cd,
+      channelId: ch, channelName: cn, channelDesc: cd,
     );
+
+    // Night before (9 PM)
+    final dayBefore = due.subtract(const Duration(days: 1));
     await schedule(
       id: id + 600000,
       title: '⚠️ $lbl TOMORROW!',
       body: '$title — Study hard!',
       when: DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 21, 0),
-      channelId: ch,
-      channelName: cn,
-      channelDesc: cd,
+      channelId: ch, channelName: cn, channelDesc: cd,
     );
-    await schedule(
-      id: id + 100000,
-      title: '🔥 $lbl in 3 hours!',
-      body: '$title — ${fmt.format(due)}',
-      when: due.subtract(const Duration(hours: 3)),
-      channelId: ch,
-      channelName: cn,
-      channelDesc: cd,
-    );
+
+    // 24 hours
     await schedule(
       id: id,
       title: '📝 $lbl in 24 hours',
       body: '$title — ${fmtD.format(due)}',
       when: due.subtract(const Duration(hours: 24)),
-      channelId: ch,
-      channelName: cn,
-      channelDesc: cd,
+      channelId: ch, channelName: cn, channelDesc: cd,
+    );
+
+    // 3 hours
+    await schedule(
+      id: id + 100000,
+      title: '🔥 $lbl in 3 hours!',
+      body: '$title — ${fmt.format(due)}',
+      when: due.subtract(const Duration(hours: 3)),
+      channelId: ch, channelName: cn, channelDesc: cd,
     );
   }
 
-  // // ── Daily Morning (Spaced Repetition) Notifications ──────────────────────
-  // static Future<void> scheduleDailyMorningNotifs(
-  //     List<StudyTopic> topics,
-  //     List<Subject> subjects,
-  //     ) async {
-  //   for (int i = 0; i < 7; i++) {
-  //     final date = DateTime.now().add(Duration(days: i));
-  //     final targetDate = DateTime(date.year, date.month, date.day);
+  // ════════════════════════════════════════════════════════════════════════════
+  // TIMETABLE NOTIFICATIONS
   //
-  //     final dueTopics = topics.where((t) {
-  //       final r = t.nextReview;
-  //       if (r == null) return false;
-  //       final rd = DateTime(r.year, r.month, r.day);
-  //       return rd.isAtSameMomentAs(targetDate);
-  //     }).toList();
-  //
-  //     if (dueTopics.isNotEmpty) {
-  //       final when = DateTime(date.year, date.month, date.day, 8, 0);
-  //       if (when.isBefore(DateTime.now())) continue;
-  //       await schedule(
-  //         id: 1000000 + i,
-  //         title: '🧠 Study Time!',
-  //         body: 'You have ${dueTopics.length} topics due for Spaced Repetition today.',
-  //         when: when,
-  //         channelId: 'study_notifs',
-  //         channelName: 'Study Reminders',
-  //       );
-  //     } else {
-  //       await cancelSingle(1000000 + i);
-  //     }
-  //   }
-  // }
+  //   weekType == 'both'  → one-shot alarm, rescheduled by midnight job
+  //   weekType == 'odd'/'even' → 2 explicit one-shots covering ~1 month
+  //   Skips days with midterm/final exams
+  // ════════════════════════════════════════════════════════════════════════════
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // TIMETABLE NOTIFICATIONS — FIXED
-  //
-  // Old approach (broken):
-  //   - Looped over dayOffset 0..2 → only 3 days ahead, expires and never
-  //     reschedules unless user opens the app
-  //   - Skipped odd/even entries that didn't match THIS week → they were
-  //     never scheduled at all if the window missed their day
-  //   - No repeat → every notification is one-shot
-  //
-  // New approach:
-  //   - weekType == 'both'  → weekly auto-repeat via matchDateTimeComponents
-  //     = DateTimeComponents.dayOfWeekAndTime. ONE alarm per class, fires
-  //     forever every week without rescheduling.
-  //   - weekType == 'odd'/'even' → schedules the next 4 matching fortnightly
-  //     occurrences (covers ~2 months). Rescheduled whenever the app opens.
-  //   - _nextWeekdayAt() ensures we always find the correct future date even
-  //     if the class day already passed this week.
-  // ════════════════════════════════════════════════════════════════════════════
   static Future<void> scheduleTimetableNotifs({
     required List<TimetableEntry> entries,
     required Map<int, String> subjectNames,
@@ -897,48 +1078,42 @@ class NotifService {
     required List<TaskModel> tasks,
   }) async {
     await cancelTimetableAll();
+
+    // Quota guard
     try {
       final pending = await _p.pendingNotificationRequests();
       final slotsAvailable = 50 - pending.length;
       if (slotsAvailable <= 8) {
-        debugPrint('⚠️ [QUOTA] Only $slotsAvailable slots free — timetable scheduling skipped');
+        NotifDiag.logSync('TTSCHED',
+            'Only $slotsAvailable slots free — timetable scheduling skipped',
+            isError: true);
         return;
       }
     } catch (_) {}
 
-    // ── Diagnostic snapshot of what we're about to schedule ──────────────────
-    await NotifDiag.log('TTSCHED',
-        'scheduleTimetableNotifs called: ${entries.length} entries, '
-            'weekType=$currentWeekType, subjects=${subjectNames.keys.toList()}');
-
     _ensureTimezone();
-
     final now = DateTime.now();
     int scheduledCount = 0;
 
-    await NotifDiag.log(
-      'TTSCHED',
-      'scheduleTimetableNotifs called: ${entries.length} entries, '
-          'weekType=$currentWeekType',
-    );
+    await NotifDiag.log('TTSCHED',
+        'scheduleTimetableNotifs: ${entries.length} entries, weekType=$currentWeekType');
 
     for (final e in entries) {
-      // ── Parse start time ──────────────────────────────────────────────────
+      // Parse time
       final parts = e.startTime.split(':');
       if (parts.length < 2) {
-        await NotifDiag.log(
-          'TTSCHED',
-          'Bad startTime "${e.startTime}" for subjectId=${e.subjectId} — skipping',
-          isError: true,
-        );
+        await NotifDiag.log('TTSCHED',
+            'Bad startTime "${e.startTime}" for subjectId=${e.subjectId}',
+            isError: true);
         continue;
       }
       final h = int.tryParse(parts[0]) ?? 0;
       final m = int.tryParse(parts[1]) ?? 0;
 
+      // Build notification content
       final subName = subjectNames[e.subjectId] ?? 'Class';
       final emoji =
-      e.type == 'lab' ? '🧪' : e.type == 'section' ? '🔧' : '📚';
+          e.type == 'lab' ? '🧪' : e.type == 'section' ? '🔧' : '📚';
       final loc = [
         if (e.room.isNotEmpty) 'Room ${e.room}',
         if (e.building.isNotEmpty) e.building,
@@ -948,18 +1123,18 @@ class NotifService {
           '${loc.isNotEmpty ? ' — $loc' : ''}';
       final notifTitle = '$emoji $subName — Starting NOW!';
 
-      // Stable ID: uniquely bound to this (dayOfWeek, startTime) slot.
-      // Uses dayOfWeek from the MODEL (not a loop variable) so IDs are
-      // identical across rescheduling calls.
+      // Stable ID based on day/time/weekType
       final minuteOfWeek = (e.dayOfWeek - 1) * 1440 + (h * 60) + m;
-      final weekTypeOff = e.weekType == 'both' ? 0 : e.weekType == 'odd' ? 1 : 2;
+      final weekTypeOff =
+          e.weekType == 'both' ? 0 : e.weekType == 'odd' ? 1 : 2;
       final baseId = 900000 + minuteOfWeek * 3 + weekTypeOff;
 
-      // ── Handle exceptional (one-time) classes ─────────────────────────────
+      // ── Exceptional (one-time) classes ──────────────────────────────────
       if (e.isExceptional && e.exceptionalDate.isNotEmpty) {
         try {
           final exDate = DateTime.parse(e.exceptionalDate);
-          final classStart = DateTime(exDate.year, exDate.month, exDate.day, h, m);
+          final classStart =
+              DateTime(exDate.year, exDate.month, exDate.day, h, m);
           if (classStart.isAfter(now.subtract(const Duration(minutes: 2)))) {
             if (!_hasExamOnDate(tasks, classStart)) {
               await schedule(
@@ -974,59 +1149,36 @@ class NotifService {
               );
               _timetableNotifIds.add(baseId + 1);
               scheduledCount++;
-              await NotifDiag.log(
-                'TTSCHED',
-                'Exceptional class: $subName on ${e.exceptionalDate} at $h:${m.toString().padLeft(2, '0')} (id:${baseId + 1})',
-              );
             }
           }
         } catch (err) {
-          await NotifDiag.log(
-            'TTSCHED',
-            'Bad exceptionalDate "${e.exceptionalDate}": $err',
-            isError: true,
-          );
+          await NotifDiag.log('TTSCHED',
+              'Bad exceptionalDate "${e.exceptionalDate}": $err',
+              isError: true);
         }
-        continue; // exceptional entries don't get the repeating logic
+        continue;
       }
 
-      // ── CASE A: weekType == 'both' → weekly auto-repeat ───────────────────
-      // One alarm, fires every 7 days automatically.
-      // Android handles the repeat — no rescheduling needed after boot
-      // (boot receiver will re-register it on reboot).
+      // ── CASE A: weekType == 'both' → one-shot (rescheduled by midnight) ─
       if (e.weekType == 'both') {
         final firstOcc = _nextWeekdayAt(now, e.dayOfWeek, h, m);
+        if (_hasExamOnDate(tasks, firstOcc)) continue;
 
-        if (_hasExamOnDate(tasks, firstOcc)) {
-          await NotifDiag.log(
-            'TTSCHED',
-            'SKIP $subName ${_dowName(e.dayOfWeek)} ${e.startTime} — exam on first occurrence ${firstOcc.toIso8601String().split('T')[0]}',
-          );
-          continue;
-        }
-
-        await _scheduleWeeklyRepeating(
+        await schedule(
           id: baseId + 1,
           title: notifTitle,
           body: body,
-          firstOccurrence: firstOcc,
+          when: firstOcc,
+          channelId: 'timetable_notifs',
+          channelName: 'Class Reminders',
+          channelDesc: 'Timetable',
           payload: 'timetable:${e.subjectId}',
         );
         _timetableNotifIds.add(baseId + 1);
         scheduledCount++;
-
-        await NotifDiag.log(
-          'TTSCHED',
-          'WEEKLY [$subName] every ${_dowName(e.dayOfWeek)} at '
-              '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} — '
-              'first occ: ${firstOcc.toIso8601String().split('T')[0]} (id:${baseId + 1})',
-        );
       }
 
-      // ── CASE B: weekType == 'odd' or 'even' → next 4 matching fortnights ──
-      // We can't use auto-repeat because the week parity changes every 7 days,
-      // so we schedule 4 explicit one-shot alarms (~2 months of coverage).
-      // They get refreshed whenever the app opens via _rescheduleNotificationsOnStart.
+      // ── CASE B: weekType == 'odd'/'even' → next 2 matching fortnights ──
       else {
         int found = 0;
         DateTime candidate = _nextWeekdayAt(now, e.dayOfWeek, h, m);
@@ -1036,12 +1188,7 @@ class NotifService {
           final wType = wNum.isOdd ? 'odd' : 'even';
 
           if (wType == e.weekType) {
-            if (_hasExamOnDate(tasks, candidate)) {
-              await NotifDiag.log(
-                'TTSCHED',
-                'SKIP $subName ${candidate.toIso8601String().split('T')[0]} — exam on that day',
-              );
-            } else {
+            if (!_hasExamOnDate(tasks, candidate)) {
               final notifId = baseId + 1 + (found * 100000);
               await schedule(
                 id: notifId,
@@ -1056,31 +1203,15 @@ class NotifService {
               _timetableNotifIds.add(notifId);
               scheduledCount++;
               found++;
-              await NotifDiag.log(
-                'TTSCHED',
-                'ODD/EVEN [$subName] ${e.weekType} week on '
-                    '${candidate.toIso8601String().split('T')[0]} at '
-                    '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} '
-                    '(id:$notifId, occurrence $found/4)',
-              );
             }
           }
 
           candidate = candidate.add(const Duration(days: 7));
-
-          // Safety cap: don't search more than 90 days out
-          if (candidate.difference(now).inDays > 90) {
-            await NotifDiag.log(
-              'TTSCHED',
-              'ODD/EVEN [$subName] — only found $found occurrences in 90 days (weekType=${e.weekType})',
-              isError: found == 0,
-            );
-            break;
-          }
+          if (candidate.difference(now).inDays > 90) break;
         }
       }
 
-      // ── Immediate notification if this class is starting RIGHT NOW (±2 min) ──
+      // ── Immediate notification if class is starting NOW (±2 min) ────────
       if (e.dayOfWeek == now.weekday) {
         final todayStart = DateTime(now.year, now.month, now.day, h, m);
         final diff = todayStart.difference(now).inMinutes;
@@ -1097,50 +1228,44 @@ class NotifService {
           );
           _timetableNotifIds.add(baseId + 2);
           scheduledCount++;
-          await NotifDiag.log(
-            'TTSCHED',
-            'IMMEDIATE notif fired for $subName (class is starting NOW)',
-          );
         }
       }
     }
 
-    await NotifDiag.log(
-      'TTSCHED',
-      'scheduleTimetableNotifs DONE — $scheduledCount alarms registered',
-      isError: scheduledCount == 0 && entries.isNotEmpty,
-    );
+    await NotifDiag.log('TTSCHED',
+        'DONE — $scheduledCount alarms registered',
+        isError: scheduledCount == 0 && entries.isNotEmpty);
   }
 
-  // ── cancelTimetableAll — payload-aware sweep ──────────────────────────────
-  //
-  // Old approach: only cancelled IDs in memory Set + a fixed ID range.
-  // Problem: fresh install has empty Set, orphaned IDs outside range survived.
-  //
-  // New approach:
-  //   1. Cancel everything in memory Set (fast path)
-  //   2. Full pending-queue sweep: cancel any remaining timetable payload
-  //      regardless of ID, catching orphans from previous sessions.
+  // ════════════════════════════════════════════════════════════════════════════
+  // CANCEL: Timetable
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> cancelTimetableAll() async {
+    // Fast path: cancel known IDs from memory
     final idsCopy = List<int>.from(_timetableNotifIds);
     _timetableNotifIds.clear();
     for (final id in idsCopy) {
       try { await _p.cancel(id); } catch (_) {}
     }
+    // Full sweep: catch orphans from previous sessions
     try {
       final pending = await _p.pendingNotificationRequests();
-      for (final notif in pending) {
-        final isTimetableRange = notif.id >= 900000 && notif.id <= 990000;
-        final hasTimetablePayload =
-            notif.payload != null && notif.payload!.startsWith('timetable:');
-        if (isTimetableRange || hasTimetablePayload) {
-          try { await _p.cancel(notif.id); } catch (_) {}
+      for (final n in pending) {
+        final isTtRange = n.id >= 900000 && n.id <= 990000;
+        final hasTtPayload =
+            n.payload != null && n.payload!.startsWith('timetable:');
+        if (isTtRange || hasTtPayload) {
+          try { await _p.cancel(n.id); } catch (_) {}
         }
       }
     } catch (_) {}
   }
 
-  // ── Reminder Notifications ────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // REMINDER NOTIFICATIONS
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> scheduleReminder(ReminderModel r) async {
     if (r.id == null) return;
     await cancelReminder(r.id!);
@@ -1160,14 +1285,16 @@ class NotifService {
   }
 
   static Future<void> rescheduleAllReminders(
-      List<ReminderModel> reminders,
-      ) async {
+      List<ReminderModel> reminders) async {
     for (final r in reminders) {
       if (!r.isDone) await scheduleReminder(r);
     }
   }
 
-  // ── Urgent Task Reminders (every 30 min) ──────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // URGENT TASK REMINDERS (30-min ping timer)
+  // ════════════════════════════════════════════════════════════════════════════
+
   static void startUrgentTaskReminder(int taskId, String title) {
     stopUrgentTaskReminder(taskId);
     show(
@@ -1180,16 +1307,14 @@ class NotifService {
       payload: 'urgent:$taskId',
       actions: [
         const AndroidNotificationAction(
-          'ack_task',
-          '✅ Working on it',
+          'ack_task', '✅ Working on it',
           showsUserInterface: true,
           cancelNotification: true,
         ),
       ],
     );
-    _urgentTimers[taskId] = Timer.periodic(const Duration(minutes: 30), (
-        _,
-        ) async {
+    _urgentTimers[taskId] =
+        Timer.periodic(const Duration(minutes: 30), (_) async {
       await show(
         id: 970000 + taskId,
         title: '⚡ Still pending: $title',
@@ -1200,8 +1325,7 @@ class NotifService {
         payload: 'urgent:$taskId',
         actions: [
           const AndroidNotificationAction(
-            'ack_task',
-            '✅ Working on it',
+            'ack_task', '✅ Working on it',
             showsUserInterface: true,
             cancelNotification: true,
           ),
@@ -1222,7 +1346,10 @@ class NotifService {
     }
   }
 
-  // ── Read My Day Notification ──────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // READ MY DAY notification
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> scheduleReadMyDayNotif({
     required List<TimetableEntry> allEntries,
     required String currentWeekType,
@@ -1239,20 +1366,19 @@ class NotifService {
     }).toList();
     if (todayEntries.isEmpty) return;
 
+    // Find last class end time
     DateTime? lastEnd;
     for (final e in todayEntries) {
       final p = e.endTime.split(':');
       if (p.length < 2) continue;
       final dt = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        int.parse(p[0]),
-        int.parse(p[1]),
+        now.year, now.month, now.day,
+        int.parse(p[0]), int.parse(p[1]),
       );
       if (lastEnd == null || dt.isAfter(lastEnd)) lastEnd = dt;
     }
     if (lastEnd == null) return;
+
     final notifyAt = lastEnd.add(const Duration(minutes: 5));
     if (notifyAt.isBefore(now)) return;
 
@@ -1267,14 +1393,12 @@ class NotifService {
       payload: 'read_my_day:choose',
       actions: [
         const AndroidNotificationAction(
-          'read_en',
-          '🔊 English',
+          'read_en', '🔊 English',
           showsUserInterface: true,
           cancelNotification: true,
         ),
         const AndroidNotificationAction(
-          'read_ar',
-          '🔊 عربي',
+          'read_ar', '🔊 عربي',
           showsUserInterface: true,
           cancelNotification: true,
         ),
@@ -1282,7 +1406,10 @@ class NotifService {
     );
   }
 
-  // ── Absence Warning ──────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // ABSENCE WARNING
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> showAbsenceWarning({
     required int subjectId,
     required String subjectName,
@@ -1294,17 +1421,17 @@ class NotifService {
     if (remaining > 1) return;
     try {
       await _p.show(
-        800000 +
-            subjectId * 10 +
+        800000 + subjectId * 10 +
             (type == 'lecture' ? 1 : type == 'section' ? 2 : 3),
-        remaining == 0 ? '🚫 Maximum Absences Reached!' : '⚠️ Absence Warning!',
+        remaining == 0
+            ? '🚫 Maximum Absences Reached!'
+            : '⚠️ Absence Warning!',
         remaining == 0
             ? '$subjectName — Reached max $type absences!'
             : '$subjectName — Only 1 $type absence left!',
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'study_notifs',
-            'Study Reminders',
+            'study_notifs', 'Study Reminders',
             channelDescription: 'Task reminders',
             importance: Importance.max,
             priority: Priority.high,
@@ -1318,55 +1445,10 @@ class NotifService {
     } catch (_) {}
   }
 
-  // // ── NOVA: Schedule daily check-in notifications ───────────────────────────
-  // static Future<void> scheduleNovaCheckIns(List<TimeOfDay> times) async {
-  //   _ensureTimezone();
-  //   for (int i = 1; i <= 3; i++) {
-  //     try {
-  //       await _p.cancel(860000 + i);
-  //     } catch (_) {}
-  //   }
-  //   for (int i = 0; i < times.length && i < 3; i++) {
-  //     final t = times[i];
-  //     final now = DateTime.now();
-  //     var next = DateTime(now.year, now.month, now.day, t.hour, t.minute);
-  //     if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
-  //     try {
-  //       await _p.zonedSchedule(
-  //         860001 + i,
-  //         '🧠 NOVA Briefing',
-  //         'Your scheduled intelligence brief is ready. Tap to open.',
-  //         tz.TZDateTime.from(next, tz.local),
-  //         NotificationDetails(
-  //           android: AndroidNotificationDetails(
-  //             'nova_checkin',
-  //             'NOVA Daily Check-ins',
-  //             channelDescription: 'Scheduled NOVA briefing notifications',
-  //             importance: Importance.high,
-  //             priority: Priority.high,
-  //           ),
-  //           iOS: const DarwinNotificationDetails(
-  //             presentAlert: true,
-  //             presentSound: true,
-  //           ),
-  //         ),
-  //         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  //         uiLocalNotificationDateInterpretation:
-  //         UILocalNotificationDateInterpretation.absoluteTime,
-  //         matchDateTimeComponents: DateTimeComponents.time,
-  //         payload: 'nova_brief_checkin',
-  //       );
-  //     } catch (e) {
-  //       NotifDiag.logSync(
-  //         'NOVA',
-  //         'scheduleNovaCheckIn[$i] error: $e',
-  //         isError: true,
-  //       );
-  //     }
-  //   }
-  // }
+  // ════════════════════════════════════════════════════════════════════════════
+  // NOVA: Mandatory Attendance Alert
+  // ════════════════════════════════════════════════════════════════════════════
 
-  // ── NOVA: Mandatory attendance alert ─────────────────────────────────────
   static Future<void> showMandatoryAttendanceAlert({
     required String subjectName,
     required String time,
@@ -1383,8 +1465,7 @@ class NotifService {
             'You have 1 absence left. Missing this bars you from the final.',
         NotificationDetails(
           android: AndroidNotificationDetails(
-            'nova_attendance',
-            'Attendance Guardian',
+            'nova_attendance', 'Attendance Guardian',
             channelDescription: 'Mandatory attendance alerts',
             importance: Importance.max,
             priority: Priority.high,
@@ -1392,8 +1473,7 @@ class NotifService {
             autoCancel: false,
             actions: [
               const AndroidNotificationAction(
-                'ack_attend',
-                "I'll be there",
+                'ack_attend', "I'll be there",
                 showsUserInterface: false,
               ),
             ],
@@ -1406,11 +1486,8 @@ class NotifService {
         payload: 'mandatory_attend:$subjectName',
       );
     } catch (e) {
-      NotifDiag.logSync(
-        'NOVA',
-        'showMandatoryAttendanceAlert error: $e',
-        isError: true,
-      );
+      NotifDiag.logSync('NOVA',
+          'showMandatoryAttendanceAlert error: $e', isError: true);
     }
   }
 
@@ -1420,70 +1497,55 @@ class NotifService {
     } catch (_) {}
   }
 
-  // ── Cancel Helpers ────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // CANCEL HELPERS
+  // ════════════════════════════════════════════════════════════════════════════
+
   static Future<void> cancelSingle(int id) async {
-    try {
-      await _p.cancel(id);
-    } catch (_) {}
+    try { await _p.cancel(id); } catch (_) {}
+    _removeFromStore(id);
   }
 
   static Future<void> cancel(int id) async {
     for (final o in [0, 100000, 200000, 300000]) {
-      try {
-        await _p.cancel(id + o);
-      } catch (_) {}
+      try { await _p.cancel(id + o); } catch (_) {}
+      _removeFromStore(id + o);
     }
   }
 
   static Future<void> cancelExam(int id) async {
     for (final o in [0, 100000, 300000, 500000, 600000]) {
-      try {
-        await _p.cancel(id + o);
-      } catch (_) {}
+      try { await _p.cancel(id + o); } catch (_) {}
+      _removeFromStore(id + o);
     }
   }
 
   static Future<void> cancelReminder(int rid) async {
     try { await _p.cancel(980000 + rid); } catch (_) {}
+    _removeFromStore(980000 + rid);
   }
 
   // ════════════════════════════════════════════════════════════════════════════
   // PRIVATE HELPERS
   // ════════════════════════════════════════════════════════════════════════════
 
-  /// Returns the next DateTime where weekday == [targetWeekday] at [h]:[m],
-  /// guaranteed to be in the future (never in the past).
+  /// Next occurrence of [targetWeekday] at [h]:[m], guaranteed future.
   static DateTime _nextWeekdayAt(
-      DateTime from,
-      int targetWeekday,
-      int h,
-      int m,
-      ) {
-    // Build today's occurrence of that weekday+time
+      DateTime from, int targetWeekday, int h, int m) {
     int daysUntil = (targetWeekday - from.weekday) % 7;
     var candidate = DateTime(
-      from.year,
-      from.month,
-      from.day + daysUntil,
-      h,
-      m,
+      from.year, from.month, from.day + daysUntil, h, m,
     );
-
-    // If the candidate is in the past (or within the 2-min grace), push forward
     if (candidate.isBefore(from.subtract(const Duration(minutes: 2)))) {
       candidate = candidate.add(const Duration(days: 7));
     }
-
     return candidate;
   }
 
-  /// Returns true if there is a midterm or final exam on the same calendar
-  /// day as [date].
+  /// True if a midterm/final exam is on the same calendar day.
   static bool _hasExamOnDate(List<TaskModel> tasks, DateTime date) {
     return tasks.any((t) {
-      if (!t.isExam || (t.type != 'midterm' && t.type != 'final')) {
-        return false;
-      }
+      if (!t.isExam || (t.type != 'midterm' && t.type != 'final')) return false;
       if (t.dueDate == null) return false;
       return t.dueDate!.year == date.year &&
           t.dueDate!.month == date.month &&
@@ -1491,55 +1553,12 @@ class NotifService {
     });
   }
 
-  /// Schedules a weekly-repeating alarm using matchDateTimeComponents.
-  /// One zonedSchedule call, fires every 7 days on the same day+time.
-  static Future<void> _scheduleWeeklyRepeating({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime firstOccurrence,
-    String? payload,
-  }) async {
-    // No longer uses matchDateTimeComponents — alarmClock mode doesn't support it.
-    // Schedules a single one-shot alarm. The midnight WorkManager job and
-    // _rescheduleNotificationsOnStart() handle rescheduling after each fires.
-    await schedule(
-      id: id,
-      title: title,
-      body: body,
-      when: firstOccurrence,
-      channelId: 'timetable_notifs',
-      channelName: 'Class Reminders',
-      channelDesc: 'Timetable',
-      payload: payload ?? '$id',
-    );
-    NotifDiag.logSync(
-      'WEEKLY',
-      'Registered one-shot (alarmClock) id=$id | "$title" | '
-          'fires=${firstOccurrence.toIso8601String().split('T')[0]}',
-    );
-  }
-
-
-  /// ISO weekday name abbreviation (1=Mon ... 7=Sun)
-  static String _dowName(int dow) =>
-      const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dow - 1];
-
-  /// ISO week number calculation (matches the app_bloc.dart implementation)
+  /// ISO week number (matches app_bloc.dart implementation).
   static int _weekNumber(DateTime date) {
     final doy = int.parse(intl.DateFormat('D').format(date));
     return ((doy - date.weekday + 10) / 7).floor();
   }
 
-  static Future<void> initForService() async {
-    _ensureTimezone();
-    try {
-      await _p.initialize(
-        const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        ),
-      );
-    } catch (_) {}
-  }
+ 
 
 }

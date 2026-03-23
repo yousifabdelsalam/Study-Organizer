@@ -1,0 +1,191 @@
+Study Organizer (NOVA/Jarvis) Project Context & App Structure
+This document provides a comprehensive overview of the study_organizer (also referred to as NOVA or Jarvis) codebase. You can use this as a system prompt or structural guide to rapidly understand the scope, features, and architecture of this Flutter project so you can easily modify and extend it.
+
+1. Project High-Level Overview
+App Description: A futuristic, highly-interactive study management application built with Flutter. It encompasses AI features (like a conversational assistant named Jarvis/NOVA), productivity tools (a "Detroit 2060" themed Pomodoro timer called "Cognitive Reactor"), subject/topic organization, schedule generation, text-to-speech feedback, voice activity detection (VAD), and background tracking to ensure focus.
+
+Core Themes & Features:
+
+Study & Task Management: Subjects, Topics, Tasks, Semesters, Exams, Marks, and Reminders.
+AI & Intelligence (Jarvis/NOVA):
+ElevenLabs integration for high-quality Text-to-Speech (
+NovaElevenLabsService.dart
+).
+Groq and Gemini integrated for intelligence, schedule building, and conversational capabilities (
+nova_intelligence_engine.dart
+, 
+jarvis_brain_service.dart
+, 
+ai_service.dart
+).
+Voice Activity Detection (VAD) using speech_to_text for a continuous wake word (
+NovaVadService.dart
+).
+Interactive UI (Detroit 2060 / Futuristic):
+Custom overlays (
+jarvis_overlay.dart
+, 
+contamination_overlay.dart
+, 
+knowledge_xray_overlay.dart
+, 
+lightning_drill_overlay.dart
+).
+Cognitive Reactor (Pomodoro system) redesigned with a "Detroit 2060" futuristic, deep-focus aesthetic (
+cognitive_reactor_page.dart
+).
+PDF text extraction, markdown rendering with LaTeX support (flutter_markdown_latex, flutter_math_fork).
+Background & Watchdog Processes:
+workmanager and app_usage for background tasks and distraction monitoring (
+nova_watchdog_service.dart
+).
+geolocator for location-based brief triggers (
+nova_location_service.dart
+).
+2. Tech Stack & Dependencies (
+pubspec.yaml
+)
+State Management: flutter_bloc & equatable
+Database: sqflite
+AI / LLM: google_generative_ai (Gemini), http (Groq API calls)
+Audio & TTS: flutter_tts, audioplayers, record (recording Audio), ElevenLabs APIs
+UX / UI: table_calendar, fl_chart, confetti, flutter_markdown, syncfusion_flutter_pdf
+Background / Hardware: workmanager, app_usage, geolocator, speech_to_text, shared_preferences
+3. Directory Structure (lib/)
+Based on the latest file tree, the application follows a robust modular structure:
+
+lib/models/ (Data Entities)
+Models represent the core data schemas parsed usually directly from SQL or JSON APIs.
+
+Core: subject.dart, topic.dart, task.dart, semester.dart, mark.dart, subject_note.dart, subject_metadata.dart.
+Scheduling/Focus: timetable.dart, pomodoro_session.dart, reminder.dart, exams.dart.
+AI: jarvis_document.dart.
+lib/bloc/ (State Management)
+Contains the global application state.
+
+app_bloc.dart, app_state.dart, app_event.dart. Note: Check how events dispatch state changes across the complex UI overlays.
+lib/services/ (Core Business & AI Logic)
+This is the heavily AI-driven backend layer.
+
+AI & Brain:
+jarvis_brain_service.dart / jarvis_service.dart: The core conversational and orchestration logic.
+nova_intelligence_engine.dart: Advanced analysis and reasoning.
+Nova_smart_schedule_service.dart: AI-generated study scheduling.
+ai_service.dart: Base AI communication.
+Voice & Audio:
+NovaElevenLabsService.dart: Handles high-fidelity TTS streaming.
+NovaVadService.dart: Voice Activity Detection / wake word listener.
+nova_audio_service.dart: General sound effects and TTS fallback.
+Context & App Integration:
+jarvis_navigator.dart: AI-driven app navigation logic.
+nova_location_service.dart: Home geofencing for daily briefs.
+nova_brief_service.dart: Daily AI summaries.
+nova_watchdog_service.dart: Distraction detection in the background.
+Database: database.dart (sqflite initialization and CRUD wrappers).
+Notifications: notifications.dart.
+lib/pages/ (Main Screens)
+main_shell.dart: Top-level navigational shell.
+dashboard.dart: The primary hub.
+subjects.dart, subject_detail.dart, topics.dart, tasks.dart, marks.dart: CRUD and list views for study data.
+cognitive_reactor_page.dart: The immersive Detroit 2060 Pomodoro/Focus timer.
+study_plan_page.dart, daily_schedule_page.dart, weekly_briefing_page.dart: Planning and schedule visualizations.
+campus.dart: Likely a social or mapping feature.
+nova_settings_page.dart: API Key configuration (Groq/Gemini) and TTS configuration.
+exam_prep_hud.dart: A specialized HUD style UI for exam period studying.
+lib/widgets/ (Components & Overlays)
+Overlays (The "HUD" elements):
+jarvis_overlay.dart: Primary AI interaction interface (microphone, TTS visuals).
+knowledge_xray_overlay.dart: For specific AI analysis formatting.
+lightning_drill_overlay.dart, night_before_overlay.dart, contamination_overlay.dart: Specialized visual modes for different study states.
+Micro-components: nova_brief_card.dart, jarvis_button.dart, jarvis_quiz_page.dart, glass.dart (glassmorphism UI wrapper), atext.dart, helpers.dart.
+4. How to Approach Developing or Modifying This App
+If you (the AI) are asked to modify this codebase, keep the following context in mind:
+
+AI Interactivity: The user values the "Jarvis" metaphor. Any response, text-to-speech function, or schedule generation should feel "smart". Ensure jarvis_brain_service.dart and nova_intelligence_engine.dart are correctly interacting with NovaElevenLabsService.dart or flutter_tts.
+Futuristic Aesthetics: Recently updated to a "Detroit 2060" aesthetic (especially the Cognitive Reactor timer). UI changes should respect clean, 3D-inspired, dynamic and "holographic" or sleek animations (e.g. glass.dart and the _overlay.dart files).
+Background Services: The app uses workmanager and app_usage heavily. Because background execution on iOS/Android is tricky with Flutter, be cautious when diagnosing errors inside nova_watchdog_service.dart or background workers.
+Recent Work/Fixes (Context):
+Added Groq and Gemini API key inputs to nova_settings_page.dart.
+Stabilized TTS and microphone capture (NovaVadService.dart).
+Cleaned up obsolete features (removed "Gap Detector" and "Mark Surgeon").
+Transformed the timer (cognitive_reactor_page.dart) to have an away-timer grace period causing phone vibrations (breach notification) if the user leaves the app when the screen is on.
+Refined AI analysis by fixing ASCII arrays into proper Markdown tables and bullet points.
+5. Next Steps for Analyzing Code
+Whenever the user asks you to implement a feature or fix a bug in a specific area:
+
+Read database.dart if introducing new fields.
+Read app_bloc.dart if cross-page state updates are needed.
+Modify /services/ for business logic (AI generation/timing rules) and /pages/ or /widgets/ for UI mapping.
+Review pubspec.yaml to ensure no conflicting library versions are introduced.
+
+here is the project structure:
+lib/
+│
+├── main.dart             # App entry point (initializes app and services)
+├── app.dart              # Main App root widget and global Theme configuration
+├── new.dart              # Auxiliary/Draft implementation file
+│
+├── bloc/                 # Global state management and event handling
+│   ├── app_bloc.dart     # Main business logic controller
+│   ├── app_event.dart    # Definitions for user & system actions
+│   └── app_state.dart    # Definitions for application UI states
+│
+├── models/               # Data Layer (Entities/PODOs)
+│   ├── exams.dart
+│   ├── jarvis_document.dart
+│   ├── mark.dart
+│   ├── pomodoro_session.dart
+│   ├── reminder.dart
+│   ├── semester.dart
+│   ├── subject.dart
+│   ├── subject_metadata.dart
+│   ├── subject_note.dart
+│   ├── task.dart
+│   ├── timetable.dart
+│   └── topic.dart
+│
+├── services/             # Core Logic, Integrations & Infrastructure
+│   ├── ai_service.dart               # Base LLM communication
+│   ├── database.dart                 # SQLite helper & CRUD operations
+│   ├── jarvis_brain_service.dart     # Core AI orchestration logic
+│   ├── jarvis_navigator.dart         # AI-driven navigation logic
+│   ├── jarvis_service.dart           # Voice and primary interaction management
+│   ├── notifications.dart            # Local notification handling
+│   ├── NovaElevenLabsService.dart    # High-quality TTS integration
+│   ├── NovaVadService.dart           # Voice Activity Detection (Wake Word)
+│   ├── nova_audio_service.dart       # General audio/sound playback
+│   ├── nova_brief_service.dart       # Daily briefing generation
+│   ├── nova_intelligence_engine.dart # Advanced reasoning and analysis
+│   ├── nova_location_service.dart    # Location/geofencing for triggers
+│   ├── Nova_smart_schedule_service.dart # AI schedule generation
+│   └── nova_watchdog_service.dart    # Distraction monitoring/background tasks
+│
+├── pages/                # Major Views & Feature Screens
+│   ├── dashboard.dart                # Main user hub
+│   ├── main_shell.dart               # App navigational shell (HUD)
+│   ├── subjects.dart                 # Subject overview list
+│   ├── subject_detail.dart           # Detailed view for a specific subject
+│   ├── topics.dart                   # Topics list/management
+│   ├── tasks.dart                    # Tasks list/management
+│   ├── marks.dart                    # Grades/marks tracking
+│   ├── calendar.dart                 # Calendar view
+│   ├── daily_schedule_page.dart      # Daily agenda view
+│   ├── study_plan_page.dart          # AI-generated study plan view
+│   ├── weekly_briefing_page.dart     # Weekly summary view
+│   ├── cognitive_reactor_page.dart   # Interactive Focus/Pomodoro Timer
+│   ├── exam_prep_hud.dart            # Specialized exam preparation mode
+│   ├── campus.dart                   # Campus/social features
+│   └── nova_settings_page.dart       # Settings (API keys, TTS config)
+│
+└── widgets/              # Reusable UI Components & Overlays
+    ├── atext.dart                    # Custom text widget
+    ├── helpers.dart                  # UI helper functions
+    ├── glass.dart                    # Glassmorphism aesthetic wrapper
+    ├── jarvis_button.dart            # Primary interaction button
+    ├── jarvis_quiz_page.dart         # Interactive quiz component
+    ├── nova_brief_card.dart          # Briefing summary card
+    ├── jarvis_overlay.dart           # Primary AI HUD overlay
+    ├── contamination_overlay.dart    # Visual state/alert overlay
+    ├── knowledge_xray_overlay.dart   # AI analysis formatting wrapper
+    ├── lightning_drill_overlay.dart  # Fast-paced quiz overlay
+    └── night_before_overlay.dart     # Crunch-time study overlay
