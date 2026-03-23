@@ -84,7 +84,7 @@ void main() async {
 
     // Initialize notification service — registers the background handler
     await NotifService.init();
-    await ClassAlarmService.init();
+    await ClassAlarmService.start();
     await MidnightScheduler.init();
     await NotifDiag.init(); // ← add this
     // ── Single WorkManager initialization for ALL background tasks ──

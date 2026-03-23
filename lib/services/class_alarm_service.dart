@@ -16,14 +16,17 @@ class ClassAlarmHandler extends TaskHandler {
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     NotifService.initForService();
     debugPrint('[ClassAlarm] Started — starter: ${starter.name}');
-    // Check immediately on start in case a class is right now
     await _checkAndFire();
+    // Fallback: fire any notifications that the OS killed
+    await NotifService.checkAndFireMissed();
   }
 
   // Fires every 1 minute — this IS the clock, no Timers needed
   @override
   void onRepeatEvent(DateTime timestamp) {
     _checkAndFire();
+    // Fallback: fire any notifications that the OS killed
+    NotifService.checkAndFireMissed();
   }
 
   @override
