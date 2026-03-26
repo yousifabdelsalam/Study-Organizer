@@ -639,6 +639,9 @@ class NotifService {
       final list = prefs.getStringList(_kStoreKey) ?? [];
       if (list.isEmpty) return;
 
+      final pending = await _p.pendingNotificationRequests();
+      final pendingIds = pending.map((p) => p.id).toSet();
+
       final now = DateTime.now().millisecondsSinceEpoch;
       final surviving = <String>[];
       int firedCount = 0;
@@ -655,20 +658,23 @@ class NotifService {
           // Past due — check if it's within 24 hours (don't fire ancient ones)
           final ageMs = now - fireMs;
           if (ageMs < 86400000) { // 24 hours in ms
-            // First cancel the (likely dead) scheduled alarm
-            try { await _p.cancel(id); } catch (_) {}
-            
-            // Fire it NOW via show()
-            await show(
-              id: id,
-              title: parts[2],
-              body: parts[3],
-              channelId: parts[4],
-              channelName: parts[5],
-              channelDesc: parts[6],
-              payload: parts[7],
-            );
-            firedCount++;
+            // ONLY fire if the OS failed to trigger it (it's still stuck in pending)
+            if (pendingIds.contains(id)) {
+              // First cancel the (likely dead) scheduled alarm
+              try { await _p.cancel(id); } catch (_) {}
+              
+              // Fire it NOW via show()
+              await show(
+                id: id,
+                title: parts[2],
+                body: parts[3],
+                channelId: parts[4],
+                channelName: parts[5],
+                channelDesc: parts[6],
+                payload: parts[7],
+              );
+              firedCount++;
+            }
           }
           // Don't keep in store — it's in the past
         } else {
@@ -1210,26 +1216,6 @@ class NotifService {
 
           candidate = candidate.add(const Duration(days: 7));
           if (candidate.difference(now).inDays > 90) break;
-        }
-      }
-
-      // ── Immediate notification if class is starting NOW (±2 min) ────────
-      if (e.dayOfWeek == now.weekday) {
-        final todayStart = DateTime(now.year, now.month, now.day, h, m);
-        final diff = todayStart.difference(now).inMinutes;
-        if (diff <= 2 &&
-            todayStart.isAfter(now.subtract(const Duration(minutes: 2)))) {
-          await show(
-            id: baseId + 2,
-            title: notifTitle,
-            body: body,
-            channelId: 'timetable_notifs',
-            channelName: 'Class Reminders',
-            channelDesc: 'Timetable',
-            payload: 'timetable:${e.subjectId}',
-          );
-          _timetableNotifIds.add(baseId + 2);
-          scheduledCount++;
         }
       }
     }
