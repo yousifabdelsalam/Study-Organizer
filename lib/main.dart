@@ -45,6 +45,9 @@ void callbackDispatcher() {
       case 'nova_friday_regen':
         await NovaIntelligenceEngine.runFridayRegen();
         break;
+      case 'midnight_reschedule':
+        await MidnightScheduler.runMidnightTask();
+        break;
     }
     return Future.value(true);
   });
@@ -97,10 +100,46 @@ void main() async {
     // Open database
     final db = await DatabaseHelper.instance.database;
 
-    runApp(EngineeringApp(db: db));
+    runApp(_AppLifecycleObserver(child: EngineeringApp(db: db)));
   },
   (error,stack){
     debugPrint('🔴 [ZONE ERROR] $error');
     debugPrint('🔴 [ZONE STACK] $stack');
   });
+}
+
+class _AppLifecycleObserver extends StatefulWidget {
+  final Widget child;
+  const _AppLifecycleObserver({Key? key, required this.child}) : super(key: key);
+
+  @override
+  State<_AppLifecycleObserver> createState() => _AppLifecycleObserverState();
+}
+
+class _AppLifecycleObserverState extends State<_AppLifecycleObserver> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('[Lifecycle] App resumed. Firing missed notifications & ensuring background service.');
+      NotifService.checkAndFireMissed();
+      ClassAlarmService.start();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
 }

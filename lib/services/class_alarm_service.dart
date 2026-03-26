@@ -14,7 +14,7 @@ class ClassAlarmHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    NotifService.initForService();
+    await NotifService.initForService();
     debugPrint('[ClassAlarm] Started — starter: ${starter.name}');
     await _checkAndFire();
     // Fallback: fire any notifications that the OS killed

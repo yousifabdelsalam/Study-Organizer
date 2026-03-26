@@ -8,13 +8,25 @@ import '../services/notifications.dart';
 
 const _kMidnightTask = 'midnight_reschedule';
 
-// ── Called by WorkManager in a background isolate ──────────────────────────
-// MUST be a top-level function (not a class method)
-@pragma('vm:entry-point')
-void workManagerDispatcher() {
-  Workmanager().executeTask((taskName, inputData) async {
-    if (taskName != _kMidnightTask) return Future.value(true);
+class _MinimalEntry {
+  final int dayOfWeek, subjectId;
+  final String startTime, endTime, type, room, building, weekType;
+  _MinimalEntry({
+    required this.dayOfWeek, required this.subjectId,
+    required this.startTime, required this.endTime,
+    required this.type, required this.room,
+    required this.building, required this.weekType,
+  });
 
+  TimetableEntry toTimetableEntry() => TimetableEntry(
+    dayOfWeek: dayOfWeek, subjectId: subjectId,
+    startTime: startTime, endTime: endTime,
+    type: type, room: room, building: building, weekType: weekType,
+  );
+}
+
+class MidnightScheduler {
+  static Future<bool> runMidnightTask() async {
     try {
       tzdata.initializeTimeZones();
       tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
@@ -73,35 +85,13 @@ void workManagerDispatcher() {
     }
 
     // Schedule the next midnight run
-    MidnightScheduler.scheduleNextMidnight();
+    scheduleNextMidnight();
 
-    return Future.value(true);
-  });
-}
+    return true;
+  }
 
-// ── Minimal data class so we don't depend on full AppBloc in background ───
-class _MinimalEntry {
-  final int dayOfWeek, subjectId;
-  final String startTime, endTime, type, room, building, weekType;
-  _MinimalEntry({
-    required this.dayOfWeek, required this.subjectId,
-    required this.startTime, required this.endTime,
-    required this.type, required this.room,
-    required this.building, required this.weekType,
-  });
-
-  // Convert to your existing TimetableEntry model
-  TimetableEntry toTimetableEntry() => TimetableEntry(
-    dayOfWeek: dayOfWeek, subjectId: subjectId,
-    startTime: startTime, endTime: endTime,
-    type: type, room: room, building: building, weekType: weekType,
-  );
-}
-
-class MidnightScheduler {
   /// Call once on app start (in main.dart, after NotifService.init())
   static Future<void> init() async {
-    await Workmanager().initialize(workManagerDispatcher, isInDebugMode: false);
     scheduleNextMidnight();
   }
 
