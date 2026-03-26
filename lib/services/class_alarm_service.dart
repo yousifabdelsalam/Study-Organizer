@@ -11,14 +11,13 @@ void startCallback() {
 }
 
 class ClassAlarmHandler extends TaskHandler {
+  static final Set<String> _firedToday = {};
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await NotifService.initForService();
     debugPrint('[ClassAlarm] Started — starter: ${starter.name}');
-    // Check immediately on start in case a class is right now
     await _checkAndFire();
-        // Fallback: fire any notifications that the OS killed
     await NotifService.checkAndFireMissed();
   }
 
@@ -26,7 +25,6 @@ class ClassAlarmHandler extends TaskHandler {
   @override
   void onRepeatEvent(DateTime timestamp) {
     _checkAndFire();
-    // Fallback: fire any notifications that the OS killed
     NotifService.checkAndFireMissed();
   }
 
@@ -36,8 +34,6 @@ class ClassAlarmHandler extends TaskHandler {
   }
 
   // ── Core logic: runs every 60 seconds ─────────────────────────────────────
-  // If a class starts within the next 60 seconds → fire show() right now.
-  // No state, no memory, no Timers. Each call is fully independent.
   Future<void> _checkAndFire() async {
     final now = DateTime.now();
     final classes = await _getTodayClasses(now);
@@ -50,10 +46,21 @@ class ClassAlarmHandler extends TaskHandler {
       // Fire if class starts within next 60 seconds (heartbeat window)
       // or started within the last 30 seconds (late wakeup tolerance)
       if (secondsUntil >= -30 && secondsUntil <= 60) {
+        final key = '${now.year}-${now.month}-${now.day}-${c.notifId}';
+        if (_firedToday.contains(key)) continue; // STRICT DUPLICATE GUARD
+        _firedToday.add(key);
+
         debugPrint(
           '[ClassAlarm] FIRING show() for "${c.title}" '
               '(${secondsUntil}s from now)',
         );
+        
+        // ── PREEMPT NATIVE OS ALARM ──
+        // Since we are creating a reliable persistent Foreground alert,
+        // we proactively cancel the underlying vanished OS scheduled alarm.
+        NotifService.cancelSingle(c.nativeBaseId + 1);
+        NotifService.cancelSingle(c.nativeBaseId + 100001);
+        
         await NotifService.show(
           id: c.notifId,
           title: c.title,
@@ -113,6 +120,10 @@ class ClassAlarmHandler extends TaskHandler {
           if (building.isNotEmpty) building,
         ].join(' · ');
 
+        final minuteOfWeek = (dayOfWeek - 1) * 1440 + (h * 60) + m;
+        final wOff = wType == 'both' ? 0 : wType == 'odd' ? 1 : 2;
+        final baseId = 900000 + minuteOfWeek * 3 + wOff;
+
         result.add(_ClassEntry(
           startTime: classDateTime,
           title: '$emoji $subName — Starting NOW!',
@@ -120,6 +131,7 @@ class ClassAlarmHandler extends TaskHandler {
               '${loc.isNotEmpty ? ' — $loc' : ''}',
           payload: 'timetable:$subjectId',
           notifId: 950000 + dayOfWeek * 10000 + h * 100 + m + subjectId,
+          nativeBaseId: baseId,
         ));
       }
 
@@ -135,12 +147,14 @@ class _ClassEntry {
   final DateTime startTime;
   final String title, body, payload;
   final int notifId;
+  final int nativeBaseId;
   const _ClassEntry({
     required this.startTime,
     required this.title,
     required this.body,
     required this.payload,
     required this.notifId,
+    required this.nativeBaseId,
   });
 }
 
