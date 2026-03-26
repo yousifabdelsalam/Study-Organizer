@@ -14,7 +14,7 @@ class ClassAlarmHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    NotifService.initForService();
+    await NotifService.initForService();
     debugPrint('[ClassAlarm] Started — starter: ${starter.name}');
     // Check immediately on start in case a class is right now
     await _checkAndFire();

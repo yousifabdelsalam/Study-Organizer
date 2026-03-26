@@ -655,6 +655,9 @@ class NotifService {
           // Past due — check if it's within 24 hours (don't fire ancient ones)
           final ageMs = now - fireMs;
           if (ageMs < 86400000) { // 24 hours in ms
+            // First cancel the (likely dead) scheduled alarm
+            try { await _p.cancel(id); } catch (_) {}
+            
             // Fire it NOW via show()
             await show(
               id: id,
@@ -666,8 +669,6 @@ class NotifService {
               payload: parts[7],
             );
             firedCount++;
-            // Also cancel the (likely dead) scheduled alarm
-            try { await _p.cancel(id); } catch (_) {}
           }
           // Don't keep in store — it's in the past
         } else {
@@ -736,6 +737,7 @@ class NotifService {
         NotifDiag.logSync('HEALTH',
             '${report.deliveryFailures} delivery failure(s) detected on init',
             isError: true);
+        await checkAndFireMissed();
       }
     } catch (_) {}
 
