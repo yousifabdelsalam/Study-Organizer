@@ -19,10 +19,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:intl/intl.dart' as intl;
-import 'package:study_organizer/features/calendar/data/models/timetable.dart';
-import 'package:study_organizer/features/calendar/data/models/reminder.dart';
+import 'package:study_organizer/features/timetable/data/models/timetable.dart';
+import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_audio_service.dart';
+import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // §1  DIAGNOSTIC LOGGER

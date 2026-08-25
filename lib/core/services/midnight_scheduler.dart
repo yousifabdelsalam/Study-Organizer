@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:study_organizer/features/calendar/data/models/timetable.dart';
+import 'package:study_organizer/features/timetable/data/models/timetable.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;

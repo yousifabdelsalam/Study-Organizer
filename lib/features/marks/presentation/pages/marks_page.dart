@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
-import 'package:study_organizer/features/marks/data/models/semester.dart';
+import 'package:study_organizer/features/gpa_calculator/data/models/semester.dart';
 import 'package:study_organizer/core/bloc/app_bloc.dart';
 import 'package:study_organizer/core/bloc/app_event.dart';
 import 'package:study_organizer/core/bloc/app_state.dart';

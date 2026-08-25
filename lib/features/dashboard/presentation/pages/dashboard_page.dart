@@ -14,10 +14,10 @@ import 'package:study_organizer/core/widgets/atext.dart';
 import 'package:study_organizer/core/utils/helpers.dart';
 import 'package:study_organizer/features/exams/presentation/widgets/night_before_overlay.dart';
 import 'package:study_organizer/features/subjects/presentation/pages/subject_detail_page.dart';
-import 'package:study_organizer/features/exams/presentation/pages/cognitive_reactor_page.dart';
+import 'package:study_organizer/features/cognitive_reactor/presentation/pages/cognitive_reactor_page.dart';
 import 'package:study_organizer/features/dashboard/presentation/widgets/nova_brief_card.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_brief_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_audio_service.dart';
+import 'package:study_organizer/features/nova_intelligence/data/services/nova_brief_service.dart';
+import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

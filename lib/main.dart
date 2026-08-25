@@ -11,8 +11,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:study_organizer/core/database/database_helper.dart';
 import 'package:study_organizer/core/services/notifications_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_watchdog_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_intelligence_engine.dart';
+import 'package:study_organizer/features/watchdog/data/services/nova_watchdog_service.dart';
+import 'package:study_organizer/features/nova_intelligence/data/services/nova_intelligence_engine.dart';
 import 'package:study_organizer/app.dart'; // Your EngineeringApp widget
 
 // ─────────────────────────────────────────────────────────────────────────────

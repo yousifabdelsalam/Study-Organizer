@@ -7,7 +7,7 @@ import 'package:study_organizer/core/bloc/app_bloc.dart';
 import 'package:study_organizer/core/bloc/app_event.dart';
 import 'package:study_organizer/core/theme/app_theme.dart';
 import 'package:study_organizer/features/shell/presentation/pages/main_shell.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/jarvis_navigator.dart';
+import 'package:study_organizer/features/jarvis_assistant/data/services/jarvis_navigator.dart';
 
 class EngineeringApp extends StatefulWidget {
   final Database db;

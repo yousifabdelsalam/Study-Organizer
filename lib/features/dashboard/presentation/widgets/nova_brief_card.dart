@@ -3,7 +3,7 @@
 // Styled after the dark circuit-board / neon-green aesthetic from the design refs.
 
 import 'package:flutter/material.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_brief_service.dart';
+import 'package:study_organizer/features/nova_intelligence/data/services/nova_brief_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NovaBriefCard — sits on the dashboard, listens to novaBriefText notifier

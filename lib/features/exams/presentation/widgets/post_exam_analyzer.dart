@@ -18,9 +18,9 @@ import 'package:intl/intl.dart';
 import 'package:study_organizer/core/bloc/app_bloc.dart';
 import 'package:study_organizer/core/bloc/app_event.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
-import 'package:study_organizer/features/subjects/data/models/subject_note.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/jarvis_brain_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_eleven_labs_service.dart';
+import 'package:study_organizer/features/notes/data/models/subject_note.dart';
+import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
+import 'package:study_organizer/features/speech_engine/data/services/eleven_labs_service.dart';
 
 // ── Extracted exam question ───────────────────────────────────────────────────
 class _ExamQuestion {

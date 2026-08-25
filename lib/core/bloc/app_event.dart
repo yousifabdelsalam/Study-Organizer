@@ -1,13 +1,13 @@
 import 'package:equatable/equatable.dart';
-import 'package:study_organizer/features/subjects/data/models/topic.dart';
-import 'package:study_organizer/features/subjects/data/models/subject_note.dart';
-import 'package:study_organizer/features/ai_assistant/data/models/jarvis_document.dart';
+import 'package:study_organizer/features/topics/data/models/topic.dart';
+import 'package:study_organizer/features/notes/data/models/subject_note.dart';
+import 'package:study_organizer/features/documents/data/models/study_document.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/marks/data/models/mark.dart';
-import 'package:study_organizer/features/marks/data/models/semester.dart';
-import 'package:study_organizer/features/calendar/data/models/timetable.dart';
-import 'package:study_organizer/features/calendar/data/models/reminder.dart';
+import 'package:study_organizer/features/gpa_calculator/data/models/semester.dart';
+import 'package:study_organizer/features/timetable/data/models/timetable.dart';
+import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 
 abstract class AppEvent extends Equatable {
   const AppEvent();

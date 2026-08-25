@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:study_organizer/features/exams/data/models/exams.dart';
 import 'package:study_organizer/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:study_organizer/features/tasks/presentation/pages/tasks_page.dart';
-import 'package:study_organizer/features/calendar/presentation/pages/calendar_page.dart';
+import 'package:study_organizer/features/timetable/presentation/pages/calendar_page.dart';
 import 'package:study_organizer/features/subjects/presentation/pages/subjects_page.dart';
 import 'package:study_organizer/features/marks/presentation/pages/marks_page.dart';
 import 'package:study_organizer/features/campus/presentation/pages/campus_page.dart';
-import 'package:study_organizer/features/ai_assistant/presentation/pages/nova_settings_page.dart';
-import 'package:study_organizer/features/ai_assistant/presentation/pages/weekly_briefing_page.dart';
-import 'package:study_organizer/features/ai_assistant/presentation/pages/study_plan_page.dart';
-import 'package:study_organizer/features/calendar/presentation/pages/daily_schedule_page.dart';
+import 'package:study_organizer/features/nova_intelligence/presentation/pages/nova_settings_page.dart';
+import 'package:study_organizer/features/nova_intelligence/presentation/pages/weekly_briefing_page.dart';
+import 'package:study_organizer/features/study_plan/presentation/pages/study_plan_page.dart';
+import 'package:study_organizer/features/daily_schedule/presentation/pages/daily_schedule_page.dart';
 import 'package:study_organizer/features/dashboard/presentation/widgets/nova_brief_card.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_brief_service.dart';
+import 'package:study_organizer/features/nova_intelligence/data/services/nova_brief_service.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});

@@ -7,27 +7,29 @@ import 'package:intl/intl.dart' as intl;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:study_organizer/features/subjects/data/models/topic.dart';
+import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/diagnostics/presentation/pages/notif_diagnostic_page.dart';
 import 'package:study_organizer/features/subjects/presentation/pages/subject_detail_page.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/ai_service.dart';
+import 'package:study_organizer/features/jarvis_assistant/data/services/ai_service.dart';
 import 'package:flutter/services.dart';
 import 'package:study_organizer/core/services/class_alarm_service.dart';
 import 'package:study_organizer/features/dashboard/presentation/widgets/nova_brief_card.dart';
 
-import 'package:study_organizer/features/ai_assistant/data/services/nova_watchdog_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_brief_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_location_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_audio_service.dart';
-import 'package:study_organizer/features/ai_assistant/data/services/nova_eleven_labs_service.dart';
-import 'package:study_organizer/features/ai_assistant/presentation/pages/nova_settings_page.dart';
+import 'package:study_organizer/features/watchdog/data/services/nova_watchdog_service.dart';
+import 'package:study_organizer/features/nova_intelligence/data/services/nova_brief_service.dart';
+import 'package:study_organizer/features/location/data/services/nova_location_service.dart';
+import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
+import 'package:study_organizer/features/speech_engine/data/services/eleven_labs_service.dart';
+import 'package:study_organizer/features/nova_intelligence/presentation/pages/nova_settings_page.dart';
+import 'package:study_organizer/features/campus/presentation/widgets/legendary_celebration_overlay.dart';
+import 'package:study_organizer/features/campus/presentation/widgets/focus_alert_banner.dart';
 
-import 'package:study_organizer/features/calendar/presentation/pages/daily_schedule_page.dart';
+import 'package:study_organizer/features/daily_schedule/presentation/pages/daily_schedule_page.dart';
 
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
-import 'package:study_organizer/features/calendar/data/models/timetable.dart';
-import 'package:study_organizer/features/calendar/data/models/reminder.dart';
+import 'package:study_organizer/features/timetable/data/models/timetable.dart';
+import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 import 'package:study_organizer/core/bloc/app_bloc.dart';
 import 'package:study_organizer/core/bloc/app_event.dart';
 import 'package:study_organizer/core/bloc/app_state.dart';
@@ -35,8 +37,8 @@ import 'package:study_organizer/core/services/notifications_service.dart';
 import 'package:study_organizer/core/widgets/glass.dart';
 import 'package:study_organizer/core/widgets/atext.dart';
 import 'package:study_organizer/core/utils/helpers.dart';
-import 'package:study_organizer/features/ai_assistant/presentation/widgets/jarvis_overlay.dart';
-import 'package:study_organizer/features/exams/presentation/widgets/layering_system_overlay.dart';
+import 'package:study_organizer/features/jarvis_assistant/presentation/widgets/jarvis_overlay.dart';
+import 'package:study_organizer/features/cognitive_reactor/presentation/widgets/layering_system_overlay.dart';
 
 class CampusPage extends StatefulWidget {
   const CampusPage({super.key});
@@ -3669,201 +3671,9 @@ class _CampusPageState extends State<CampusPage>
 }
 
 // ═══════════════════════════════════════════
-// CELEBRATION OVERLAY (unchanged)
-// ═══════════════════════════════════════════
-class LegendaryCelebrationOverlay extends StatefulWidget {
-  final VoidCallback onDismiss;
-  const LegendaryCelebrationOverlay({super.key, required this.onDismiss});
-
-  @override
-  State<LegendaryCelebrationOverlay> createState() =>
-      _LegendaryCelebrationOverlayState();
-}
-
-class _LegendaryCelebrationOverlayState
-    extends State<LegendaryCelebrationOverlay>
-    with TickerProviderStateMixin {
-  late List<ConfettiController> _fireworks;
-  late AnimationController _colorCtrl;
-  late AnimationController _scaleCtrl;
-  late Animation<double> _scaleAnim;
-  Timer? _barrageTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _fireworks = List.generate(
-      5,
-      (_) => ConfettiController(duration: const Duration(milliseconds: 800)),
-    );
-    _startFireworksBarrage();
-    _colorCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-    _scaleCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-    _scaleAnim = CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut);
-  }
-
-  void _startFireworksBarrage() {
-    int index = 0;
-    _barrageTimer = Timer.periodic(const Duration(milliseconds: 500), (t) {
-      if (!mounted) return;
-      _fireworks[index % 5].play();
-      index++;
-    });
-  }
-
-  @override
-  void dispose() {
-    for (var c in _fireworks) c.dispose();
-    _colorCtrl.dispose();
-    _scaleCtrl.dispose();
-    _barrageTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _colorCtrl,
-      builder: (context, child) {
-        final color = HSVColor.fromAHSV(
-          0.85,
-          _colorCtrl.value * 360,
-          1.0,
-          1.0,
-        ).toColor();
-        return Stack(
-          children: [
-            ModalBarrier(color: color, dismissible: false),
-            Align(
-              alignment: const Alignment(-0.8, -0.8),
-              child: _buildFirework(0),
-            ),
-            Align(
-              alignment: const Alignment(0.8, -0.8),
-              child: _buildFirework(1),
-            ),
-            Align(
-              alignment: const Alignment(0, -0.5),
-              child: _buildFirework(2),
-            ),
-            Align(
-              alignment: const Alignment(-0.8, 0.5),
-              child: _buildFirework(3),
-            ),
-            Align(
-              alignment: const Alignment(0.8, 0.5),
-              child: _buildFirework(4),
-            ),
-            Center(
-              child: ScaleTransition(
-                scale: _scaleAnim,
-                child: Glass(
-                  margin: const EdgeInsets.all(24),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 48,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.emoji_events_rounded,
-                        size: 100,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(height: 24),
-                      _buildShakingText("LEGENDARY!"),
-                      const SizedBox(height: 12),
-                      const Text(
-                        "FULL MARK ACQUIRED",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: widget.onDismiss,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                        ),
-                        child: const Text(
-                          "I AM UNSTOPPABLE",
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildFirework(int index) {
-    return ConfettiWidget(
-      confettiController: _fireworks[index],
-      blastDirectionality: BlastDirectionality.explosive,
-      shouldLoop: false,
-      colors: const [Colors.white, Colors.yellow, Colors.cyan, Colors.lime],
-      minBlastForce: 20,
-      maxBlastForce: 50,
-      numberOfParticles: 15,
-    );
-  }
-
-  Widget _buildShakingText(String text) {
-    return StreamBuilder<int>(
-      stream: Stream.periodic(const Duration(milliseconds: 50), (i) => i),
-      builder: (context, snapshot) {
-        final offset = snapshot.hasData
-            ? Offset(
-                (Random().nextDouble() - 0.5) * 6,
-                (Random().nextDouble() - 0.5) * 6,
-              )
-            : Offset.zero;
-        return Transform.translate(
-          offset: offset,
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 42,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  color: Colors.black,
-                  blurRadius: 10,
-                  offset: Offset(2, 2),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ═══════════════════════════════════════════
 // JARVIS FAB (unchanged)
 // ═══════════════════════════════════════════
+
 class _JarvisFab extends StatefulWidget {
   const _JarvisFab();
 
@@ -3944,98 +3754,4 @@ class _JarvisFabState extends State<_JarvisFab>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Focus Alert Banner — shows when screen unlocks during focus mode
-// ─────────────────────────────────────────────────────────────────────────────
-class _FocusAlertBanner extends StatefulWidget {
-  final int minutesLeft;
-  final VoidCallback onDismiss;
-  const _FocusAlertBanner({required this.minutesLeft, required this.onDismiss});
 
-  @override
-  State<_FocusAlertBanner> createState() => _FocusAlertBannerState();
-}
-
-class _FocusAlertBannerState extends State<_FocusAlertBanner>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _slide = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _ctrl.forward();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SlideTransition(
-      position: _slide,
-      child: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF4757), Color(0xFFFF6B81)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.shield_rounded, color: Colors.white, size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '🔴 FOCUS MODE ACTIVE',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '${widget.minutesLeft} min remaining — put the phone down!',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                constraints: const BoxConstraints(),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onDismiss,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
