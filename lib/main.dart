@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:study_organizer/services/class_alarm_service.dart';
-import 'package:study_organizer/services/midnight_scheduler.dart';
+import 'package:study_organizer/core/services/class_alarm_service.dart';
+import 'package:study_organizer/core/services/midnight_scheduler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:sqflite/sqflite.dart';
 
 import 'package:workmanager/workmanager.dart';
-import 'services/database.dart';
-import 'services/notifications.dart';
-import 'services/nova_watchdog_service.dart';
-import 'services/nova_intelligence_engine.dart';
-import 'app.dart'; // Your EngineeringApp widget
+import 'package:study_organizer/core/database/database_helper.dart';
+import 'package:study_organizer/core/services/notifications_service.dart';
+import 'package:study_organizer/features/ai_assistant/data/services/nova_watchdog_service.dart';
+import 'package:study_organizer/features/ai_assistant/data/services/nova_intelligence_engine.dart';
+import 'package:study_organizer/app.dart'; // Your EngineeringApp widget
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIFIED WORKMANAGER DISPATCHER
@@ -87,18 +87,28 @@ void main() async {
 
     // Initialize notification service — registers the background handler
     await NotifService.init();
-    await ClassAlarmService.start();
-    await MidnightScheduler.init();
-    await NotifDiag.init(); // ← add this
+    await NotifDiag.init();
+
     // ── Single WorkManager initialization for ALL background tasks ──
     // Both watchdog and intelligence engine use this shared dispatcher.
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    // MUST be initialized before MidnightScheduler.init() or NovaIntelligenceEngine.scheduleFridayRegen()
+    try {
+      await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+      await MidnightScheduler.init();
+      await NovaIntelligenceEngine.scheduleFridayRegen();
+    } catch (e) {
+      debugPrint('WorkManager init error (non-fatal): $e');
+    }
 
-    // Schedule background tasks (non-blocking — use shared WorkManager instance)
-    await NovaIntelligenceEngine.scheduleFridayRegen();
-
-    // Open database
+    // Open database cleanly
     final db = await DatabaseHelper.instance.database;
+
+    // Start background class alarm foreground service safely
+    try {
+      await ClassAlarmService.start();
+    } catch (e) {
+      debugPrint('ClassAlarmService start error (non-fatal): $e');
+    }
 
     runApp(_AppLifecycleObserver(child: EngineeringApp(db: db)));
   },
