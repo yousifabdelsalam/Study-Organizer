@@ -3,10 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
-import 'bloc/app_bloc.dart';
-import 'bloc/app_event.dart';
-import 'pages/main_shell.dart';
-import 'services/jarvis_navigator.dart';
+import 'package:study_organizer/core/bloc/app_bloc.dart';
+import 'package:study_organizer/core/bloc/app_event.dart';
+import 'package:study_organizer/core/theme/app_theme.dart';
+import 'package:study_organizer/features/shell/presentation/pages/main_shell.dart';
+import 'package:study_organizer/features/jarvis_assistant/data/services/jarvis_navigator.dart';
+
+// Feature Cubits
+import 'package:study_organizer/features/subjects/presentation/cubit/subjects_cubit.dart';
+import 'package:study_organizer/features/tasks/presentation/cubit/tasks_cubit.dart';
+import 'package:study_organizer/features/attendance/presentation/cubit/attendance_cubit.dart';
+import 'package:study_organizer/features/marks/presentation/cubit/marks_cubit.dart';
+import 'package:study_organizer/features/topics/presentation/cubit/topics_cubit.dart';
+import 'package:study_organizer/features/notes/presentation/cubit/notes_cubit.dart';
+import 'package:study_organizer/features/timetable/presentation/cubit/timetable_cubit.dart';
+import 'package:study_organizer/features/reminders/presentation/cubit/reminders_cubit.dart';
+import 'package:study_organizer/features/documents/presentation/cubit/documents_cubit.dart';
+import 'package:study_organizer/features/gpa_calculator/presentation/cubit/gpa_cubit.dart';
 
 class EngineeringApp extends StatefulWidget {
   final Database db;
@@ -30,75 +43,30 @@ class _EngineeringAppState extends State<EngineeringApp> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => AppBloc(widget.db)..add(LoadAll()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => AppBloc(widget.db)..add(LoadAll())),
+        BlocProvider(create: (_) => SubjectsCubit()..loadSubjects()),
+        BlocProvider(create: (_) => TasksCubit()..loadTasks()),
+        BlocProvider(create: (_) => AttendanceCubit()..loadAttendance()),
+        BlocProvider(create: (_) => MarksCubit()..loadMarks()),
+        BlocProvider(create: (_) => TopicsCubit()..loadTopics()),
+        BlocProvider(create: (_) => NotesCubit()..loadNotes()),
+        BlocProvider(create: (_) => TimetableCubit()..loadTimetable()),
+        BlocProvider(create: (_) => RemindersCubit()..loadReminders()),
+        BlocProvider(create: (_) => DocumentsCubit()..loadDocuments()),
+        BlocProvider(create: (_) => GpaCubit()..loadSemesters()),
+      ],
       child: ValueListenableBuilder<ThemeMode>(
         valueListenable: EngineeringApp.themeNotifier,
         builder: (_, mode, __) => MaterialApp(
           debugShowCheckedModeBanner: false,
           navigatorKey: JarvisNavigator.navigatorKey,
           themeMode: mode,
-          theme: _theme(Brightness.light),
-          darkTheme: _theme(Brightness.dark),
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
           home: MainShell(key: JarvisNavigator.shellKey),
         ),
-      ),
-    );
-  }
-
-  ThemeData _theme(Brightness b) {
-    final dark = b == Brightness.dark;
-    return ThemeData(
-      useMaterial3: true,
-      brightness: b,
-      colorSchemeSeed: const Color(0xFF6C63FF),
-      scaffoldBackgroundColor: dark
-          ? const Color(0xFF0A0A1A)
-          : const Color(0xFF68B7B3),
-      appBarTheme: AppBarTheme(
-        backgroundColor: dark
-            ? const Color(0xFF12122A).withOpacity(0.9)
-            : const Color(0xFF0E6463).withOpacity(0.9),
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
-        centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 19,
-          color: Colors
-              .white, // Ensure text is visible on the dark teal appbar in light mode
-        ),
-        iconTheme: IconThemeData(
-          color: dark ? const Color(0xFF9D97FF) : Colors.white,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        color: dark
-            ? const Color(0xFF1A1A3E).withOpacity(0.55)
-            : const Color(0xFF0E6463).withOpacity(0.75),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: dark ? const Color(0xFF1A1A3E) : const Color(0xFF68B7B3),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF6C63FF), width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: const Color(0xFF6C63FF),
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
