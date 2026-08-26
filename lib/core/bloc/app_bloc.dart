@@ -226,7 +226,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     if (newTopic.nextReview != null) {
       try {
         await NotifService.schedule(
-          id: 900000 + newTopic.id!,
+          id: 100000 + newTopic.id!,
           title: '🧠 Review: ${newTopic.title}',
           body: 'Spaced repetition time!',
           when: newTopic.nextReview!,
@@ -244,7 +244,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     final db = await DatabaseHelper.instance.database;
     await db.delete('topics', where: 'id=?', whereArgs: [e.id]);
     try {
-      await NotifService.cancelSingle(900000 + e.id);
+      await NotifService.cancelSingle(100000 + e.id);
     } catch (_) {}
     await _reload(emit);
   }
@@ -259,7 +259,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       whereArgs: [e.topic.id],
     );
     try {
-      await NotifService.cancelSingle(900000 + e.topic.id!);
+      await NotifService.cancelSingle(100000 + e.topic.id!);
     } catch (_) {}
     await _reload(emit);
   }
@@ -278,7 +278,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     );
     try {
       await NotifService.schedule(
-        id: 900000 + e.topic.id!,
+        id: 100000 + e.topic.id!,
         title: '🧠 Review: ${e.topic.title}',
         body: 'Custom review date — time to study!',
         when: e.reviewDate,
@@ -826,30 +826,18 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     final db = await DatabaseHelper.instance.database;
     final id = await db.insert('reminders', e.r.toMap());
     try {
-      final when = e.r.dateTime;
-      if (when != null && when.isAfter(DateTime.now())) {
-        await NotifService.schedule(
-          id: 700000 + id,
-          title: '🔔 Reminder',
-          body: e.r.text,
-          when: when,
-          channelId: 'reminder_notifs',
-          channelName: 'Reminders',
-          channelDesc: 'Custom reminders',
-        );
-        final early = when.subtract(const Duration(minutes: 15));
-        if (early.isAfter(DateTime.now())) {
-          await NotifService.schedule(
-            id: 700000 + id + 50000,
-            title: '⏰ Reminder in 15 min',
-            body: e.r.text,
-            when: early,
-            channelId: 'reminder_notifs',
-            channelName: 'Reminders',
-            channelDesc: 'Custom reminders',
-          );
-        }
-      }
+      // FIX: Use NotifService.scheduleReminder() which handles both main
+      // and 15-min-early notifications in non-overlapping ID ranges.
+      // Was: manually scheduling at 700,000+id AND rescheduleAllReminders
+      // also scheduling at 980,000+id — double-scheduling wasted quota.
+      final reminderWithId = ReminderModel(
+        id: id,
+        text: e.r.text,
+        date: e.r.date,
+        time: e.r.time,
+        isDone: e.r.isDone,
+      );
+      await NotifService.scheduleReminder(reminderWithId);
     } catch (err) {
       debugPrint('Reminder schedule error: $err');
     }
@@ -863,8 +851,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     final db = await DatabaseHelper.instance.database;
     await db.delete('reminders', where: 'id=?', whereArgs: [e.id]);
     try {
-      await NotifService.cancelSingle(700000 + e.id);
-      await NotifService.cancelSingle(700000 + e.id + 50000);
+      await NotifService.cancelReminder(e.id);
     } catch (_) {}
     await _reload(emit);
   }
@@ -882,8 +869,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     );
     if (e.done) {
       try {
-        await NotifService.cancelSingle(700000 + e.id);
-        await NotifService.cancelSingle(700000 + e.id + 50000);
+        await NotifService.cancelReminder(e.id);
       } catch (_) {}
     }
     await _reload(emit);

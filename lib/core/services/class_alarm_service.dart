@@ -56,11 +56,12 @@ class ClassAlarmHandler extends TaskHandler {
         );
         
         // ── PREEMPT NATIVE OS ALARM ──
-        // Since we are creating a reliable persistent Foreground alert,
-        // we proactively cancel the underlying vanished OS scheduled alarm.
-        NotifService.cancelSingle(c.nativeBaseId + 1);
-        NotifService.cancelSingle(c.nativeBaseId + 100001);
+        // Cancel the scheduled alarm so we don't get a double notification.
+        // Uses the timetable scheduled ID range (110,000+).
+        NotifService.cancelSingle(c.nativeScheduledId);
         
+        // FIX: Use foreground ID range (200,000+) — guaranteed no collision
+        // with the scheduled alarm IDs (110,000+).
         await NotifService.show(
           id: c.notifId,
           title: c.title,
@@ -120,9 +121,15 @@ class ClassAlarmHandler extends TaskHandler {
           if (building.isNotEmpty) building,
         ].join(' · ');
 
+        // Timetable scheduled ID: same formula as scheduleTimetableNotifs()
+        // so cancelSingle() targets the correct alarm.
         final minuteOfWeek = (dayOfWeek - 1) * 1440 + (h * 60) + m;
         final wOff = wType == 'both' ? 0 : wType == 'odd' ? 1 : 2;
-        final baseId = 900000 + minuteOfWeek * 3 + wOff;
+        final scheduledId = 110000 + minuteOfWeek * 3 + wOff; // _IdRange.timetable base
+
+        // FIX: Foreground alarm uses _IdRange.foreground (200,000+)
+        // — no collision with scheduled timetable alarms (110,000+).
+        final foregroundId = 200000 + dayOfWeek * 10000 + h * 100 + m + (subjectId % 50);
 
         result.add(_ClassEntry(
           startTime: classDateTime,
@@ -130,8 +137,8 @@ class ClassAlarmHandler extends TaskHandler {
           body: '${type[0].toUpperCase()}${type.substring(1)}'
               '${loc.isNotEmpty ? ' — $loc' : ''}',
           payload: 'timetable:$subjectId',
-          notifId: 950000 + dayOfWeek * 10000 + h * 100 + m + subjectId,
-          nativeBaseId: baseId,
+          notifId: foregroundId,
+          nativeScheduledId: scheduledId,
         ));
       }
 
@@ -146,15 +153,15 @@ class ClassAlarmHandler extends TaskHandler {
 class _ClassEntry {
   final DateTime startTime;
   final String title, body, payload;
-  final int notifId;
-  final int nativeBaseId;
+  final int notifId;           // Foreground service notification ID (200,000+)
+  final int nativeScheduledId; // Scheduled alarm ID to cancel (110,000+)
   const _ClassEntry({
     required this.startTime,
     required this.title,
     required this.body,
     required this.payload,
     required this.notifId,
-    required this.nativeBaseId,
+    required this.nativeScheduledId,
   });
 }
 
