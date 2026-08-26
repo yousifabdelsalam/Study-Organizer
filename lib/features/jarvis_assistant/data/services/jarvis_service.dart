@@ -462,7 +462,7 @@ class JarvisService {
       reply = "Online and fully operational, sir.";
     } else if (_kw(t, ['nova status', 'status report', 'give me a status'])) {
       final now = DateTime.now();
-      final pending = tasks.where((t) => !t.isCompleted).length;
+      final pending = tasks.where((t) => !t.isCompleted && !t.isFailed).length;
       final today = timetable.where((e) => e.dayOfWeek == now.weekday).length;
       reply =
           "Status: $today classes today, $pending pending tasks. All systems nominal, sir.";
@@ -699,7 +699,7 @@ class JarvisService {
     }
 
     final upTasks =
-        tasks.where((t) => !t.isCompleted && t.dueDate != null).toList()
+        tasks.where((t) => !t.isCompleted && !t.isFailed && t.dueDate != null).toList()
           ..sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
 
     final yesterdayTime = now.subtract(const Duration(days: 1));

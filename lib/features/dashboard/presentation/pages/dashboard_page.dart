@@ -15,9 +15,8 @@ import 'package:study_organizer/core/utils/helpers.dart';
 import 'package:study_organizer/features/exams/presentation/widgets/night_before_overlay.dart';
 import 'package:study_organizer/features/subjects/presentation/pages/subject_detail_page.dart';
 import 'package:study_organizer/features/cognitive_reactor/presentation/pages/cognitive_reactor_page.dart';
-import 'package:study_organizer/features/dashboard/presentation/widgets/nova_brief_card.dart';
-import 'package:study_organizer/features/nova_intelligence/data/services/nova_brief_service.dart';
 import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
+
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -130,11 +129,14 @@ class _DashboardPageState extends State<DashboardPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final pending = state.tasks.where((t) => !t.isCompleted).toList();
+          final pending = state.tasks
+              .where((t) => !t.isCompleted && !t.isFailed)
+              .toList();
           final today = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
           final todayCount = state.tasks
               .where(
                 (t) =>
+                    !t.isFailed &&
                     t.dueDate != null &&
                     intl.DateFormat('yyyy-MM-dd').format(t.dueDate!) == today,
               )
@@ -160,9 +162,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 .toList();
           }
 
-          final progress = state.tasks.isNotEmpty
-              ? state.tasks.where((t) => t.isCompleted).length /
-                    state.tasks.length
+          final activeTasks = state.tasks.where((t) => !t.isFailed).toList();
+          final progress = activeTasks.isNotEmpty
+              ? activeTasks.where((t) => t.isCompleted).length /
+                    activeTasks.length
               : 0.0;
 
           final tomorrow = DateTime.now().add(const Duration(days: 1));
@@ -171,12 +174,14 @@ class _DashboardPageState extends State<DashboardPage> {
               .where(
                 (t) =>
                     !t.isCompleted &&
+                    !t.isFailed &&
                     t.isExam &&
                     t.dueDate != null &&
                     intl.DateFormat('yyyy-MM-dd').format(t.dueDate!) ==
                         tomorrowStr,
               )
               .toList();
+
 
           return ListView(
             physics: const BouncingScrollPhysics(),
@@ -253,6 +258,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
               if (upcoming.isNotEmpty)
                 _upcoming(upcoming, state.subjects, context, isNight),
+
 
               if (upcoming.isEmpty && isNight)
                 const Center(
@@ -700,6 +706,9 @@ class _DashboardPageState extends State<DashboardPage> {
       ],
     );
   }
+
+
+
 
   Widget _nightBeforeBanner(BuildContext context, List<TaskModel> exams) {
     // 🔊 Play critical exam sound once per session when banner first appears

@@ -62,6 +62,9 @@ class JarvisBrainService {
         await prefs.setString('${_prefGeminiKeyBase}_$i', k);
       }
     }
+    if (keys.isNotEmpty && keys[0].trim().isNotEmpty) {
+      await prefs.setString(_prefGeminiKeyBase, keys[0].trim());
+    }
     // Invalidate cache so next request reloads the pool
     _keyPool = [];
     _keyPoolLoaded = false;
@@ -69,9 +72,17 @@ class JarvisBrainService {
     clearModelCache();
   }
 
-  /// Legacy single-key setter — stores key as slot 0.
+  /// Legacy single-key setter — stores key as slot 0 without clearing other slots.
   static Future<void> setApiKey(String key) async {
-    await setApiKeys([key]);
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('${_prefGeminiKeyBase}_0', trimmed);
+    await prefs.setString(_prefGeminiKeyBase, trimmed);
+    _keyPool = [];
+    _keyPoolLoaded = false;
+    _keyIndex = 0;
+    clearModelCache();
   }
 
   /// Load all saved keys as a list of 6 strings (empty string = empty slot).
@@ -176,118 +187,113 @@ class JarvisBrainService {
   }
 
   static Future<String> _generateContent(String prompt, {List<JarvisDocument>? attachedDocs}) async {
-    final apiKey = await getApiKey();
-    if (apiKey == null || apiKey.isEmpty) {
-      throw Exception(
-        'No Gemini API key. Get a free key at aistudio.google.com and set it in NOVA settings.',
-      );
+    await _loadKeyPool();
+    if (_keyPool.isEmpty) {
+      throw Exception('NO_KEY: Please set your Gemini API key in NOVA settings. Get a free key at aistudio.google.com');
     }
 
-    // Use the actual models available for this API key (from ListModels)
-    // Fallbacks only if ListModels call itself fails
-    // Fallbacks if ListModels fails — ordered by confirmed availability
-    // gemini-2.5-flash confirmed working with Files API on student accounts
     const fallbackIds = [
-      'gemini-2.5-flash', // CONFIRMED WORKING on student accounts
-      'gemini-2.5-pro', // Gemini 3 Pro (may be named this in API)
-      'gemini-3.0-flash', // Gemini 3 Fast
-      'gemini-3.0-pro', // Gemini 3 Pro
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-3.0-flash',
+      'gemini-3.0-pro',
       'gemini-2.0-flash-exp',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
     ];
 
-    final fromApi = await _listAvailableModels(apiKey);
-    List<String> toTry;
-    if (_cachedModelId != null && fromApi.contains(_cachedModelId!)) {
-      // Cached model is still valid — try it first, then others
-      toTry = [_cachedModelId!, ...fromApi.where((m) => m != _cachedModelId!)];
-    } else {
-      toTry = fromApi.isNotEmpty
-          ? fromApi
-          : _sortModelsSmartestFirst(fallbackIds);
-    }
-
     String? lastError;
 
-    for (final modelId in toTry) {
-      for (final version in ['v1beta', 'v1']) {
-        final url =
-            'https://generativelanguage.googleapis.com/$version/models/$modelId:generateContent?key=$apiKey';
-        try {
-          final res = await http
-              .post(
-                Uri.parse(url),
-                headers: {'Content-Type': 'application/json'},
-                body: jsonEncode({
-                  'contents': [
-                    {
-                      'parts': [
-                        if (attachedDocs != null)
-                          for (final d in attachedDocs.where((d) => d.fileUri != null && d.fileMime != null))
-                            {
-                              'fileData': {
-                                'mimeType': d.fileMime,
-                                'fileUri': d.fileUri,
-                              }
-                            },
-                        {'text': prompt},
-                      ],
+    for (final apiKey in _keyPool) {
+      if (apiKey.trim().isEmpty) continue;
+      final fromApi = await _listAvailableModels(apiKey);
+      List<String> toTry;
+      if (_cachedModelId != null && fromApi.contains(_cachedModelId!)) {
+        toTry = [_cachedModelId!, ...fromApi.where((m) => m != _cachedModelId!)];
+      } else {
+        toTry = fromApi.isNotEmpty ? fromApi : _sortModelsSmartestFirst(fallbackIds);
+      }
+
+      for (final modelId in toTry) {
+        for (final version in ['v1beta', 'v1']) {
+          final url =
+              'https://generativelanguage.googleapis.com/$version/models/$modelId:generateContent?key=$apiKey';
+          try {
+            final res = await http
+                .post(
+                  Uri.parse(url),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'contents': [
+                      {
+                        'parts': [
+                          if (attachedDocs != null)
+                            for (final d in attachedDocs.where((d) => d.fileUri != null && d.fileMime != null))
+                              {
+                                'fileData': {
+                                  'mimeType': d.fileMime,
+                                  'fileUri': d.fileUri,
+                                }
+                              },
+                          {'text': prompt},
+                        ],
+                      },
+                    ],
+                    'generationConfig': {
+                      'temperature': 0.3,
+                      'maxOutputTokens': 4096,
                     },
-                  ],
-                  'generationConfig': {
-                    'temperature': 0.3,
-                    'maxOutputTokens': 4096,
-                  },
-                }),
-              )
-              .timeout(const Duration(seconds: 60));
-          if (res.statusCode == 200) {
-            _cachedModelId = modelId;
-            final data = jsonDecode(res.body) as Map<String, dynamic>;
-            final candidates = data['candidates'] as List<dynamic>?;
-            if (candidates != null && candidates.isNotEmpty) {
-              final content = candidates[0]['content'] as Map<String, dynamic>?;
-              final parts = content?['parts'] as List<dynamic>?;
-              if (parts != null && parts.isNotEmpty) {
-                final text = parts[0]['text'] as String?;
-                return text?.trim() ?? 'No response.';
+                  }),
+                )
+                .timeout(const Duration(seconds: 60));
+            if (res.statusCode == 200) {
+              _cachedModelId = modelId;
+              final data = jsonDecode(res.body) as Map<String, dynamic>;
+              final candidates = data['candidates'] as List<dynamic>?;
+              if (candidates != null && candidates.isNotEmpty) {
+                final content = candidates[0]['content'] as Map<String, dynamic>?;
+                final parts = content?['parts'] as List<dynamic>?;
+                if (parts != null && parts.isNotEmpty) {
+                  final text = parts[0]['text'] as String?;
+                  return text?.trim() ?? 'No response.';
+                }
               }
+              return 'No response.';
             }
-            return 'No response.';
+            if (res.statusCode == 404 ||
+                (res.body.contains('not found') ||
+                    res.body.contains('is not supported'))) {
+              continue;
+            }
+            if (res.statusCode == 429 ||
+                res.body.contains('RESOURCE_EXHAUSTED') ||
+                res.body.contains('quota')) {
+              _cachedModelId = null;
+              lastError =
+                  'Quota exceeded on API key. Trying next key...';
+              break;
+            }
+            if (res.statusCode == 403 || res.statusCode == 401) {
+              lastError =
+                  'Invalid or restricted API key. Trying next key...';
+              break;
+            }
+            lastError = res.body.length > 200
+                ? '${res.body.substring(0, 200)}...'
+                : res.body;
+          } catch (e) {
+            debugPrint('Gemini $version/$modelId error: $e');
           }
-          if (res.statusCode == 404 ||
-              (res.body.contains('not found') ||
-                  res.body.contains('is not supported'))) {
-            continue;
-          }
-          if (res.statusCode == 429 ||
-              res.body.contains('RESOURCE_EXHAUSTED') ||
-              res.body.contains('quota')) {
-            _cachedModelId = null;
-            lastError =
-                'Quota exceeded. Try again in a few minutes or use a new key from aistudio.google.com';
-            continue;
-          }
-          if (res.statusCode == 403 || res.statusCode == 401) {
-            throw Exception(
-              'Invalid or restricted API key. Use a key from aistudio.google.com',
-            );
-          }
-          lastError = res.body.length > 200
-              ? '${res.body.substring(0, 200)}...'
-              : res.body;
-        } catch (e) {
-          if (e is Exception) rethrow;
-          debugPrint('Gemini $version/$modelId error: $e');
         }
       }
     }
+
     throw Exception(
       lastError ??
-          'No Gemini model worked. Create a new API key at aistudio.google.com',
+          'No Gemini model worked. Check your API key and connection.',
     );
   }
+
 
   // ── High-output generation for long-form reports ─────────────────────────
   // Uses up to 65536 output tokens. Falls back to 16384/8192 if rejected.
@@ -1663,7 +1669,7 @@ Be precise, analytical, and ruthlessly smart. Base everything ONLY on the conten
     sb.writeln();
 
     sb.writeln('=== TASKS (incomplete first) ===');
-    final pending = tasks.where((t) => !t.isCompleted).toList();
+    final pending = tasks.where((t) => !t.isCompleted && !t.isFailed).toList();
     for (final t in pending.take(50)) {
       final due = t.dueDate != null
           ? intl.DateFormat('MMM d, HH:mm').format(t.dueDate!)
@@ -1831,17 +1837,16 @@ REASONING:
     } catch (e) {
       debugPrint('JarvisBrain chat error: $e');
       final msg = e.toString().replaceFirst('Exception: ', '');
-      if (msg.contains('API key') ||
-          msg.contains('403') ||
-          msg.contains('401')) {
+      if (msg.startsWith('NO_KEY:')) {
         return 'Please set your Gemini API key in NOVA settings. Get a free key at aistudio.google.com';
       }
       if (msg.contains('Quota exceeded') || msg.contains('quota')) {
-        return msg.split('\n').first;
+        return 'Quota exceeded on your Gemini API key(s). Please try again in a few minutes or add another key in settings.';
       }
-      return 'Something went wrong. Check your connection and API key.';
+      return 'AI Generation Error: $msg';
     }
   }
+
 
   // ── Generate quiz ──────────────────────────────────────────────────────────
   static Future<Map<String, dynamic>?> generateQuiz({
@@ -2083,7 +2088,7 @@ FORMATTING:
     }
     sb.writeln();
     sb.writeln('=== PENDING TASKS ===');
-    for (final t in tasks.where((t) => !t.isCompleted)) {
+    for (final t in tasks.where((t) => !t.isCompleted && !t.isFailed)) {
       final due = t.dueDate != null
           ? intl.DateFormat('MMM d').format(t.dueDate!)
           : 'no date';

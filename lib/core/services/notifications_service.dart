@@ -655,9 +655,9 @@ class NotifService {
         if (id == null || fireMs == null) continue;
 
         if (now >= fireMs) {
-          // Past due — check if it's within 24 hours (don't fire ancient ones)
+          // Past due — only fire if missed by less than 5 minutes (prevents firing for ended classes)
           final ageMs = now - fireMs;
-          if (ageMs < 86400000) { // 24 hours in ms
+          if (ageMs <= 300000) { // 5 minutes in ms
             // ONLY fire if the OS failed to trigger it (it's still stuck in pending)
             if (pendingIds.contains(id)) {
               // First cancel the (likely dead) scheduled alarm
@@ -678,6 +678,7 @@ class NotifService {
           }
           // Don't keep in store — it's in the past
         } else {
+
           surviving.add(entry);
         }
       }
@@ -1524,11 +1525,12 @@ class NotifService {
     var candidate = DateTime(
       from.year, from.month, from.day + daysUntil, h, m,
     );
-    if (candidate.isBefore(from.subtract(const Duration(minutes: 2)))) {
+    if (!candidate.isAfter(from)) {
       candidate = candidate.add(const Duration(days: 7));
     }
     return candidate;
   }
+
 
   /// True if a midterm/final exam is on the same calendar day.
   static bool _hasExamOnDate(List<TaskModel> tasks, DateTime date) {

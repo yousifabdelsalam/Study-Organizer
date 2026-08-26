@@ -24,6 +24,9 @@ import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 import 'package:study_organizer/features/marks/data/models/mark.dart';
 import 'package:study_organizer/features/quizzes/presentation/pages/quiz_page.dart';
+import 'package:study_organizer/features/jarvis_assistant/domain/services/nova_local_query_router.dart';
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data model for a chat room
@@ -561,13 +564,31 @@ class _JarvisOverlayState extends State<JarvisOverlay>
     _textController.clear();
     _scrollToBottom();
 
+    final appState = context.read<AppBloc>().state;
+
+    // ⚡ Check Zero-Token Local Query Router first
+    if (NovaLocalQueryRouter.canHandleLocally(trimmed)) {
+      final localReply = NovaLocalQueryRouter.solveQueryLocally(
+        query: trimmed,
+        state: appState,
+      );
+      if (mounted) {
+        _addMessageToActive('nova', localReply);
+        setState(() => _loadingBrain = false);
+        _scrollToBottom();
+        final cleanForTts = JarvisBrainService.stripMarkdownForTts(localReply);
+        NovaElevenLabsService.speak(cleanForTts); // fire-and-forget
+      }
+      return;
+    }
+
     final contextString = _buildBrainContext();
     final reply = await JarvisBrainService.chat(
       context: contextString,
       history: _getBrainHistory(),
       userMessage: trimmed,
       personalityMode: _sarcasmMode ? 'sarcastic' : 'normal',
-      attachedDocs: context.read<AppBloc>().state.jarvisDocuments,
+      attachedDocs: appState.jarvisDocuments,
     );
 
     if (mounted) {
@@ -578,6 +599,7 @@ class _JarvisOverlayState extends State<JarvisOverlay>
       NovaElevenLabsService.speak(cleanForTts); // fire-and-forget
     }
   }
+
 
   // ── Quick chips ──────────────────────────────────────────────────────────────
   Future<void> _onQuickRecommend() async {

@@ -24,7 +24,8 @@ import 'package:study_organizer/features/nova_intelligence/presentation/pages/no
 import 'package:study_organizer/features/campus/presentation/widgets/legendary_celebration_overlay.dart';
 import 'package:study_organizer/features/campus/presentation/widgets/focus_alert_banner.dart';
 
-import 'package:study_organizer/features/daily_schedule/presentation/pages/daily_schedule_page.dart';
+import 'package:study_organizer/features/study_plan/presentation/pages/nova_smart_schedule_hub.dart';
+
 
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
@@ -39,6 +40,15 @@ import 'package:study_organizer/core/widgets/atext.dart';
 import 'package:study_organizer/core/utils/helpers.dart';
 import 'package:study_organizer/features/jarvis_assistant/presentation/widgets/jarvis_overlay.dart';
 import 'package:study_organizer/features/cognitive_reactor/presentation/widgets/layering_system_overlay.dart';
+import 'package:study_organizer/features/digital_twin/presentation/pages/digital_twin_page.dart';
+import 'package:study_organizer/features/risk_radar/domain/services/risk_radar_engine.dart';
+import 'package:study_organizer/features/risk_radar/presentation/widgets/academic_risk_radar_card.dart';
+import 'package:study_organizer/features/study_sessions/presentation/widgets/log_study_session_sheet.dart';
+import 'package:study_organizer/features/reality_memory/presentation/pages/reality_memory_gallery_page.dart';
+import 'package:study_organizer/features/campus/presentation/widgets/new_semester_dialog.dart';
+
+
+
 
 class CampusPage extends StatefulWidget {
   const CampusPage({super.key});
@@ -574,14 +584,26 @@ class _CampusPageState extends State<CampusPage>
         .where(
           (t) =>
               !t.isCompleted &&
+              !t.isFailed &&
               t.dueDate != null &&
               t.dueDate!.difference(now).inHours < 48,
         )
         .toList();
 
+    final riskProfiles = RiskRadarEngine.evaluateSemesterRisk(
+      subjects: state.subjects,
+      tasks: state.tasks,
+      topics: state.topics,
+      marks: state.marks,
+      absences: state.absences,
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (riskProfiles.isNotEmpty)
+          AcademicRiskRadarCard(riskProfiles: riskProfiles),
+
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -613,24 +635,107 @@ class _CampusPageState extends State<CampusPage>
                 style: TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => JarvisOverlay.show(ctx),
-                icon: const Icon(
-                  Icons.psychology_rounded,
-                  color: Color(0xFF2A2A72),
-                ),
-                label: const Text("SECOND BRAIN"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF2A2A72),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => JarvisOverlay.show(ctx),
+                      icon: const Icon(
+                        Icons.psychology_rounded,
+                        color: Color(0xFF2A2A72),
+                        size: 17,
+                      ),
+                      label: const Text("SECOND BRAIN", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF2A2A72),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(builder: (_) => const DigitalTwinPage()),
+                      ),
+                      icon: const Icon(
+                        Icons.bolt,
+                        color: Colors.white,
+                        size: 17,
+                      ),
+                      label: const Text("DIGITAL TWIN", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00F0FF).withValues(alpha: 0.25),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF00F0FF), width: 1.2),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        ctx,
+                        MaterialPageRoute(builder: (_) => const RealityMemoryGalleryPage()),
+                      ),
+                      icon: const Icon(
+                        Icons.camera_rounded,
+                        color: Color(0xFF00F0FF),
+                        size: 17,
+                      ),
+                      label: const Text("REALITY MEMORY", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.3),
+                        foregroundColor: const Color(0xFF00F0FF),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => LogStudySessionSheet.show(ctx),
+                      icon: const Icon(
+                        Icons.timer_outlined,
+                        color: Color(0xFFFFD600),
+                        size: 17,
+                      ),
+                      label: const Text("LOG STUDY", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.3),
+                        foregroundColor: const Color(0xFFFFD600),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
             ],
           ),
         ),
+
         const SizedBox(height: 24),
         if (urgentTasks.isNotEmpty) ...[
           const Text(
@@ -717,16 +822,17 @@ class _CampusPageState extends State<CampusPage>
                   Expanded(
                     child: _novaActionBtn(
                       icon: Icons.calendar_view_week_rounded,
-                      label: 'Weekly Schedule',
-                      color: const Color(0xFFFF9F43),
+                      label: 'Smart Planner',
+                      color: const Color(0xFF00F0FF),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const DailySchedulePage(),
+                          builder: (_) => const NovaSmartScheduleHub(),
                         ),
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 8),
                   Expanded(
                     child: _novaActionBtn(
@@ -2912,6 +3018,7 @@ class _CampusPageState extends State<CampusPage>
         .where(
           (t) =>
               !t.isCompleted &&
+              !t.isFailed &&
               t.dueDate != null &&
               t.dueDate!.isAfter(now.subtract(const Duration(days: 1))),
         )
@@ -3173,53 +3280,173 @@ class _CampusPageState extends State<CampusPage>
   }
 
   // ═══════════════════════════════════════════
-  // BACKUP TAB (unchanged)
+  // BACKUP & NEW SEMESTER TAB
   // ═══════════════════════════════════════════
   Widget _backupTab(BuildContext ctx) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Glass(
+        // ── Backup & Restore Card ───────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.3), width: 1.2),
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.cloud_sync, size: 50, color: Color(0xFF6C63FF)),
-              const Text(
-                "Backup & Restore",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              const Row(
+                children: [
+                  Icon(Icons.cloud_sync_rounded, size: 28, color: Color(0xFF00F0FF)),
+                  SizedBox(width: 10),
+                  Text(
+                    "DATABASE BACKUP & RESTORE",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: () => ctx.read<AppBloc>().add(ExportData()),
-                icon: const Icon(Icons.upload),
-                label: const Text("Export"),
+              const SizedBox(height: 6),
+              Text(
+                "Export or restore all subjects, tasks, marks, study sessions, reality memories & AI documents.",
+                style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.65)),
               ),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final res = await FilePicker.platform.pickFiles(
-                    type: FileType.any,
-                  );
-                  if (res == null || res.files.single.path == null) return;
-
-                  ctx.read<AppBloc>().add(ImportData(res.files.single.path!));
-
-                  await Future.delayed(const Duration(seconds: 2));
-                  if (!mounted) return;
-
-                  final newState = context.read<AppBloc>().state;
-                  _rescheduleNotificationsOnStart(newState);
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Data imported & notifications rescheduled'),
-                        backgroundColor: Color(0xFF2ED573),
-                        duration: Duration(seconds: 3),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => ctx.read<AppBloc>().add(ExportData()),
+                      icon: const Icon(Icons.upload_rounded, color: Colors.black, size: 18),
+                      label: const Text("EXPORT ALL", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00F0FF),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.download),
-                label: const Text("Import"),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final res = await FilePicker.platform.pickFiles(type: FileType.any);
+                        if (res == null || res.files.single.path == null) return;
+
+                        ctx.read<AppBloc>().add(ImportData(res.files.single.path!));
+                        await Future.delayed(const Duration(seconds: 2));
+                        if (!mounted) return;
+
+                        final newState = context.read<AppBloc>().state;
+                        _rescheduleNotificationsOnStart(newState);
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Complete Database Restored & Notifications Synchronized'),
+                              backgroundColor: Color(0xFF2ED573),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.download_rounded, color: Color(0xFF00F0FF), size: 18),
+                      label: const Text("IMPORT", style: TextStyle(color: Color(0xFF00F0FF), fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF00F0FF)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── New Semester Transition Card ────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFFF0055).withValues(alpha: 0.5), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF0055).withValues(alpha: 0.12),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.rocket_launch_rounded, size: 28, color: Color(0xFFFF0055)),
+                  SizedBox(width: 10),
+                  Text(
+                    "NEW SEMESTER RESET",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                      color: Color(0xFFFF0055),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Reset active counters to 0 (tasks, schedule, absences, streaks) and migrate failure root-causes & reality memories so you never repeat past mistakes.",
+                style: TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.35),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.shield_outlined, color: Colors.white60, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Protected by password verification to prevent accidental clicks.",
+                        style: TextStyle(color: Colors.white60, fontSize: 10.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => NewSemesterDialog.show(ctx),
+                  icon: const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 18),
+                  label: const Text(
+                    "INITIALIZE NEW SEMESTER",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.1),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF0055),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
               ),
             ],
           ),
@@ -3227,6 +3454,7 @@ class _CampusPageState extends State<CampusPage>
       ],
     );
   }
+
 
   // ═══════════════════════════════════════════
   // 🧠 STUDY TAB — WITH SET DATE, RESET, DELETE

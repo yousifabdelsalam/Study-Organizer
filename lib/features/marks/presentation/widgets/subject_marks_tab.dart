@@ -13,9 +13,10 @@ import 'package:study_organizer/core/widgets/atext.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/marks/data/models/mark.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
-import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
-import 'package:study_organizer/features/exams/presentation/widgets/post_exam_analyzer.dart';
 import 'package:study_organizer/features/attendance/presentation/widgets/subject_attendance_tab.dart';
+import 'package:study_organizer/features/timeline_replay/domain/services/timeline_replay_engine.dart';
+import 'package:study_organizer/features/timeline_replay/presentation/widgets/timeline_replay_dialog.dart';
+
 
 class SubjectMarksTab extends StatelessWidget {
   final Subject subject;
@@ -293,6 +294,29 @@ class SubjectMarksTab extends StatelessWidget {
                         ),
                         IconButton(
                           icon: const Icon(
+                            Icons.history_rounded,
+                            size: 17,
+                            color: Color(0xFF00F0FF),
+                          ),
+                          tooltip: 'Timeline Forensic Replay',
+                          onPressed: () {
+                            final state = ctx.read<AppBloc>().state;
+                            final report = TimelineReplayEngine.reconstructTimeline(
+                              subjectName: subject.name,
+                              subjectId: subject.id ?? 0,
+                              mark: m,
+                              allTopics: state.topics,
+                              allTasks: state.tasks,
+                              allAbsences: state.absences,
+                              allSessions: const [],
+                            );
+                            TimelineReplayDialog.show(ctx, report);
+                          },
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                        IconButton(
+                          icon: const Icon(
                             Icons.close,
                             size: 16,
                             color: Colors.red,
@@ -302,6 +326,7 @@ class SubjectMarksTab extends StatelessWidget {
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.only(left: 4),
                         ),
+
                       ],
                     ),
                   ),
