@@ -30,6 +30,7 @@ import 'package:intl/intl.dart' as intl;
 import 'package:study_organizer/features/timetable/data/models/timetable.dart';
 import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
+import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1141,10 +1142,9 @@ class NotifService {
     if (diff.isNegative) return;
 
     final fmt = intl.DateFormat('h:mm a');
-    final fmtD = intl.DateFormat('MMM d');
 
     if (diff.inDays <= 7) {
-      // 3-hour mark
+      // 3-hour mark (e.g. final sprint)
       final threeH = due.subtract(const Duration(hours: 3));
       if (threeH.isAfter(now)) {
         await schedule(
@@ -1155,21 +1155,10 @@ class NotifService {
         );
       }
 
-      // 24-hour mark
-      final oneDay = due.subtract(const Duration(hours: 24));
-      if (oneDay.isAfter(now)) {
-        await schedule(
-          id: _IdRange.task24h + (id % 10000),
-          title: '⏰ Due in 24 hours',
-          body: '$title — ${fmtD.format(due)} at ${fmt.format(due)}',
-          when: oneDay,
-        );
-      }
-
-      // Night before (9 PM)
+      // Night before at 6:00 PM (18:00) — student evening study window
       final dayBefore = due.subtract(const Duration(days: 1));
       final nightBefore =
-          DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 21, 0);
+          DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 18, 0);
       if (nightBefore.isAfter(now)) {
         await schedule(
           id: _IdRange.taskNight + (id % 10000),
@@ -1204,7 +1193,6 @@ class NotifService {
     final now = DateTime.now();
     if (due.difference(now).isNegative) return;
 
-    final fmt = intl.DateFormat('h:mm a');
     final fmtD = intl.DateFormat('MMM d');
     final lbl = examType[0].toUpperCase() + examType.substring(1);
     const ch = 'exam_notifs';
@@ -1223,10 +1211,10 @@ class NotifService {
       );
     }
 
-    // Night before (9 PM)
+    // Night before at 6:00 PM (18:00)
     final dayBefore = due.subtract(const Duration(days: 1));
     final nightBefore =
-        DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 21, 0);
+        DateTime(dayBefore.year, dayBefore.month, dayBefore.day, 18, 0);
     if (nightBefore.isAfter(now)) {
       await schedule(
         id: _IdRange.examNight + (id % 10000),
@@ -1237,7 +1225,7 @@ class NotifService {
       );
     }
 
-    // 24 hours
+    // 24 hours before
     final oneDay = due.subtract(const Duration(hours: 24));
     if (oneDay.isAfter(now)) {
       await schedule(
@@ -1245,18 +1233,6 @@ class NotifService {
         title: '📝 $lbl in 24 hours',
         body: '$title — ${fmtD.format(due)}',
         when: oneDay,
-        channelId: ch, channelName: cn, channelDesc: cd,
-      );
-    }
-
-    // 3 hours
-    final threeH = due.subtract(const Duration(hours: 3));
-    if (threeH.isAfter(now)) {
-      await schedule(
-        id: _IdRange.exam3h + (id % 10000),
-        title: '🔥 $lbl in 3 hours!',
-        body: '$title — ${fmt.format(due)}',
-        when: threeH,
         channelId: ch, channelName: cn, channelDesc: cd,
       );
     }
@@ -1377,20 +1353,19 @@ class NotifService {
         scheduledCount++;
       }
 
-      // ── CASE B: weekType == 'odd'/'even' → next 2 matching fortnights ──
+      // ── CASE B: weekType == 'odd'/'even' → next matching class (rolling 1-slot) ──
       else {
         int found = 0;
         DateTime candidate = _nextWeekdayAt(now, e.dayOfWeek, h, m);
 
-        while (found < 2) {
+        while (found < 1) {
           final wNum = _weekNumber(candidate);
           final wType = wNum.isOdd ? 'odd' : 'even';
 
           if (wType == e.weekType) {
             if (!_hasExamOnDate(tasks, candidate)) {
-              final notifId = baseId + (found * 50000);
               await schedule(
-                id: notifId,
+                id: baseId,
                 title: notifTitle,
                 body: bodyText,
                 when: candidate,
@@ -1399,7 +1374,7 @@ class NotifService {
                 channelDesc: 'Timetable',
                 payload: 'timetable:${e.subjectId}',
               );
-              _timetableNotifIds.add(notifId);
+              _timetableNotifIds.add(baseId);
               scheduledCount++;
               found++;
             }
@@ -1483,6 +1458,74 @@ class NotifService {
       List<ReminderModel> reminders) async {
     for (final r in reminders) {
       if (!r.isDone) await scheduleReminder(r);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SPACED REPETITION TOPIC REVIEWS (Smart Daily Digest)
+  //
+  // Groups all due topics by day for the next 7 days.
+  // Schedules exactly 1 consolidated notification per day at 6:00 PM (18:00).
+  // Uses at most 7 slots total regardless of whether you have 5 or 100 topics!
+  // ════════════════════════════════════════════════════════════════════════════
+
+  static Future<void> scheduleTopicReviews(List<StudyTopic> topics) async {
+    await cancelTopicReviews();
+    final now = DateTime.now();
+
+    // Group active due topics by day offset (0 = today, 1 = tomorrow, ..., 7 = next week)
+    final Map<int, List<StudyTopic>> topicsByDay = {};
+
+    for (final topic in topics) {
+      if (topic.isMastered || topic.nextReview == null) continue;
+      final reviewDate = topic.nextReview!;
+      final diffDays = DateTime(reviewDate.year, reviewDate.month, reviewDate.day)
+          .difference(DateTime(now.year, now.month, now.day))
+          .inDays;
+
+      if (diffDays >= 0 && diffDays <= 7) {
+        topicsByDay.putIfAbsent(diffDays, () => []).add(topic);
+      }
+    }
+
+    for (final entry in topicsByDay.entries) {
+      final dayOffset = entry.key;
+      final dueTopics = entry.value;
+      if (dueTopics.isEmpty) continue;
+
+      final targetDate = now.add(Duration(days: dayOffset));
+      final fireTime =
+          DateTime(targetDate.year, targetDate.month, targetDate.day, 18, 0); // 6:00 PM
+
+      if (fireTime.isBefore(now)) continue;
+
+      final count = dueTopics.length;
+      final sampleTitles = dueTopics.map((t) => t.title).take(2).join(', ');
+      final moreCount = count > 2 ? ' +${count - 2} more' : '';
+
+      final dayLabel = dayOffset == 0
+          ? 'today'
+          : dayOffset == 1
+              ? 'tomorrow'
+              : 'in $dayOffset days';
+
+      await schedule(
+        id: _IdRange.topicReview + dayOffset,
+        title: '🧠 Spaced Review: $count topic${count > 1 ? 's' : ''} due $dayLabel',
+        body: '$sampleTitles$moreCount — Keep your memory fresh!',
+        when: fireTime,
+        channelId: 'study_notifs',
+        channelName: 'Study Reminders',
+        channelDesc: 'Spaced repetition reviews',
+        payload: 'topics:review',
+      );
+    }
+  }
+
+  static Future<void> cancelTopicReviews() async {
+    for (int i = 0; i <= 7; i++) {
+      try { await _p.cancel(_IdRange.topicReview + i); } catch (_) {}
+      _removeFromStore(_IdRange.topicReview + i);
     }
   }
 

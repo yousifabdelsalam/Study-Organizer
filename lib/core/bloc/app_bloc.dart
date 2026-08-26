@@ -193,6 +193,8 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     }
     // Re-schedule reminders
     await NotifService.rescheduleAllReminders(rm);
+    // Re-schedule spaced repetition topic review daily digest
+    await NotifService.scheduleTopicReviews(tp);
   }
 
   // ── Topics ────────────────────────────────────────────────────────────────
@@ -223,18 +225,6 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       where: 'id=?',
       whereArgs: [e.topic.id],
     );
-    if (newTopic.nextReview != null) {
-      try {
-        await NotifService.schedule(
-          id: 100000 + newTopic.id!,
-          title: '🧠 Review: ${newTopic.title}',
-          body: 'Spaced repetition time!',
-          when: newTopic.nextReview!,
-        );
-      } catch (err) {
-        debugPrint('Review notif error: $err');
-      }
-    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('bonus_xp', (prefs.getInt('bonus_xp') ?? 0) + 50);
     await _reload(emit);
@@ -243,9 +233,6 @@ class AppBloc extends Bloc<AppEvent, AppState> {
   Future<void> _onDeleteTopic(DeleteTopic e, Emitter<AppState> emit) async {
     final db = await DatabaseHelper.instance.database;
     await db.delete('topics', where: 'id=?', whereArgs: [e.id]);
-    try {
-      await NotifService.cancelSingle(100000 + e.id);
-    } catch (_) {}
     await _reload(emit);
   }
 
@@ -258,9 +245,6 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       where: 'id=?',
       whereArgs: [e.topic.id],
     );
-    try {
-      await NotifService.cancelSingle(100000 + e.topic.id!);
-    } catch (_) {}
     await _reload(emit);
   }
 
@@ -276,14 +260,6 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       where: 'id=?',
       whereArgs: [e.topic.id],
     );
-    try {
-      await NotifService.schedule(
-        id: 100000 + e.topic.id!,
-        title: '🧠 Review: ${e.topic.title}',
-        body: 'Custom review date — time to study!',
-        when: e.reviewDate,
-      );
-    } catch (_) {}
     await _reload(emit);
   }
 
