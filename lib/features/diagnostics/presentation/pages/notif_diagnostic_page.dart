@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_organizer/core/services/notifications_service.dart';
-import 'package:study_organizer/features/diagnostics/presentation/pages/notif_diagnostic_page.dart';
 import 'package:study_organizer/core/bloc/app_bloc.dart';
 
 class NotifDiagnosticPage extends StatefulWidget {
