@@ -588,7 +588,6 @@ class _JarvisOverlayState extends State<JarvisOverlay>
       history: _getBrainHistory(),
       userMessage: trimmed,
       personalityMode: _sarcasmMode ? 'sarcastic' : 'normal',
-      attachedDocs: appState.jarvisDocuments,
     );
 
     if (mounted) {
