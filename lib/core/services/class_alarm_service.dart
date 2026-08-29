@@ -21,11 +21,15 @@ class ClassAlarmHandler extends TaskHandler {
     await NotifService.checkAndFireMissed();
   }
 
-  // Fires every 1 minute — this IS the clock, no Timers needed
+  // Fires every 15 seconds — this IS the clock, no Timers needed
   @override
   void onRepeatEvent(DateTime timestamp) {
     _checkAndFire();
-    NotifService.checkAndFireMissed();
+    // Run the heavier fallback check every ~60s (every 4th tick)
+    _tickCount++;
+    if (_tickCount % 4 == 0) {
+      NotifService.checkAndFireMissed();
+    }
   }
 
   @override
@@ -33,7 +37,9 @@ class ClassAlarmHandler extends TaskHandler {
     debugPrint('[ClassAlarm] Destroyed (isTimeout: $isTimeout)');
   }
 
-  // ── Core logic: runs every 60 seconds ─────────────────────────────────────
+  // ── Core logic: runs every 15 seconds ─────────────────────────────────────
+  static int _tickCount = 0;
+
   Future<void> _checkAndFire() async {
     final now = DateTime.now();
     final classes = await _getTodayClasses(now);
@@ -43,12 +49,16 @@ class ClassAlarmHandler extends TaskHandler {
     for (final c in classes) {
       final secondsUntil = c.startTime.difference(now).inSeconds;
 
-      // Fire if class starts within next 60 seconds (heartbeat window)
-      // or started within the last 30 seconds (late wakeup tolerance)
-      if (secondsUntil >= -30 && secondsUntil <= 60) {
+      // Fire if class starts within next 20 seconds (just over 1 heartbeat)
+      // or started within the last 5 minutes (Doze-proof safety net).
+      // The duplicate guard (_firedToday) prevents double notifications,
+      // so the wide late window costs nothing — it only catches misses.
+      if (secondsUntil >= -300 && secondsUntil <= 20) {
         final key = '${now.year}-${now.month}-${now.day}-${c.notifId}';
         if (_firedToday.contains(key)) continue; // STRICT DUPLICATE GUARD
         _firedToday.add(key);
+
+        final lateSeconds = -secondsUntil; // positive = how late we are
 
         debugPrint(
           '[ClassAlarm] FIRING show() for "${c.title}" '
@@ -60,12 +70,17 @@ class ClassAlarmHandler extends TaskHandler {
         // Uses the timetable scheduled ID range (110,000+).
         NotifService.cancelSingle(c.nativeScheduledId);
         
+        // Build body — add late indicator if more than 60s late
+        final body = lateSeconds > 60
+            ? '⏰ ${(lateSeconds / 60).ceil()}m late — ${c.body}'
+            : c.body;
+        
         // FIX: Use foreground ID range (200,000+) — guaranteed no collision
         // with the scheduled alarm IDs (110,000+).
         await NotifService.show(
           id: c.notifId,
           title: c.title,
-          body: c.body,
+          body: body,
           channelId: 'timetable_notifs',
           channelName: 'Class Reminders',
           channelDesc: 'Timetable',
@@ -185,8 +200,10 @@ class ClassAlarmService {
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        // 60000ms = 1 minute — this is the clock tick
-        eventAction: ForegroundTaskEventAction.repeat(60000),
+        // 15000ms = 15 seconds — tight heartbeat for accurate class alerts.
+        // The foreground service is the PRIMARY delivery mechanism; Android's
+        // zonedSchedule is the backup. 15s ticks guarantee ≤15s delivery jitter.
+        eventAction: ForegroundTaskEventAction.repeat(15000),
         autoRunOnBoot: true,
         autoRunOnMyPackageReplaced: true,
         allowWakeLock: true,

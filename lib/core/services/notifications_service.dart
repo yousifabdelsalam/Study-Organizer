@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:intl/intl.dart' as intl;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:study_organizer/features/timetable/data/models/timetable.dart';
 import 'package:study_organizer/features/reminders/data/models/reminder.dart';
 import 'package:study_organizer/features/tasks/data/models/task.dart';
@@ -189,6 +190,25 @@ class NotifDiag {
             isError: !exactAlarm);
       } catch (e) {
         await log('PERM', 'canScheduleExactNotifications() threw: $e',
+            isError: true);
+      }
+
+      // Battery optimization status — this is the #1 cause of OS-killed alarms
+      try {
+        if (Platform.isAndroid) {
+          final batteryExempt = await Permission.ignoreBatteryOptimizations.isGranted;
+          await log('PERM', 'Battery optimization exempt: $batteryExempt',
+              isError: !batteryExempt);
+          if (!batteryExempt) {
+            await log('PERM',
+                '⚠️ Battery optimization is ON — Android WILL kill scheduled alarms! '
+                'Go to Settings → Battery → App → Remove restrictions, '
+                'or grant the exemption from the app.',
+                isError: true);
+          }
+        }
+      } catch (e) {
+        await log('PERM', 'Battery optimization check threw: $e',
             isError: true);
       }
     } catch (e) {
@@ -415,6 +435,21 @@ class NotifHealthMonitor {
               severity: NotifIssueSeverity.critical,
               message: 'Exact alarms DENIED — scheduled notifications will not fire',
             ));
+          }
+        } catch (_) {}
+
+        // Battery optimization — the #1 cause of OS-killed alarms
+        try {
+          if (Platform.isAndroid) {
+            final batteryExempt = await Permission.ignoreBatteryOptimizations.isGranted;
+            if (!batteryExempt) {
+              issues.add(const NotifIssue(
+                layer: 'L1-Permission',
+                severity: NotifIssueSeverity.critical,
+                message: 'Battery optimization is ON — Android will kill scheduled alarms. '
+                    'Go to Settings → Battery → App → Remove restrictions',
+              ));
+            }
           }
         } catch (_) {}
       }
@@ -766,9 +801,12 @@ class NotifService {
         if (id == null || fireMs == null) continue;
 
         if (now >= fireMs) {
-          // Past due — only fire if missed by less than 5 minutes
+          // Past due — only fire if missed by less than 30 minutes
+          // (was 5min, but Doze mode can delay the 60s heartbeat, causing
+          // the fallback to miss the window entirely — 30min gives enough
+          // slack for "class started N minutes ago" to still be useful)
           final ageMs = now - fireMs;
-          if (ageMs <= 300000) { // 5 minutes in ms
+          if (ageMs <= 1800000) { // 30 minutes in ms
             // ONLY fire if the OS failed to trigger it (still stuck in pending)
             if (pendingIds.contains(id)) {
               // Release lock before plugin calls to avoid deadlock
@@ -776,10 +814,14 @@ class NotifService {
 
               // Cancel the dead scheduled alarm, then fire immediately
               try { await _p.cancel(id); } catch (_) {}
+              final lateMinutes = (ageMs / 60000).round();
+              final lateBody = lateMinutes > 2
+                  ? '⏰ ${lateMinutes}m late — ${parts[3]}'
+                  : parts[3];
               await show(
                 id: id,
                 title: parts[2],
-                body: parts[3],
+                body: lateBody,
                 channelId: parts[4],
                 channelName: parts[5],
                 channelDesc: parts[6],
@@ -851,6 +893,23 @@ class NotifService {
     if (android != null) {
       try { await android.requestNotificationsPermission(); } catch (_) {}
       try { await android.requestExactAlarmsPermission(); } catch (_) {}
+    }
+
+    // Request battery optimization exemption — without this, Android can
+    // (and does) silently kill scheduled alarms. This shows the system
+    // dialog "Allow app to run in background?" once.
+    try {
+      if (Platform.isAndroid) {
+        final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+        if (!batteryStatus.isGranted) {
+          final result = await Permission.ignoreBatteryOptimizations.request();
+          NotifDiag.logSync('PERM',
+              'Battery optimization exemption: ${result.isGranted ? "GRANTED ✓" : "DENIED ✗"}',
+              isError: !result.isGranted);
+        }
+      }
+    } catch (e) {
+      NotifDiag.logSync('PERM', 'Battery exemption request failed: $e');
     }
 
     // Run delivery failure check on init (detects OS-killed alarms)
