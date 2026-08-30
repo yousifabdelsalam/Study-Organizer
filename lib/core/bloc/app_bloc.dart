@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/subjects/data/models/subject_metadata.dart';
 import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
 
@@ -131,6 +132,8 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       )).map((e) => JarvisDocument.fromMap(e)).toList();
       final metaRows = await db.query('subject_metadata');
       meta = metaRows.map((e) => SubjectMetadata.fromMap(e)).toList();
+      // Ensure initial FTS5 index is populated
+      unawaited(DocumentSearchIndexer.reindexAll(jd));
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
@@ -868,7 +871,16 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     Emitter<AppState> emit,
   ) async {
     final db = await DatabaseHelper.instance.database;
-    await db.insert('jarvis_documents', e.document.toMap());
+    final id = await db.insert('jarvis_documents', e.document.toMap());
+    if (id > 0) {
+      unawaited(DocumentSearchIndexer.indexDocument(
+        docId: id,
+        subjectId: e.document.subjectId,
+        docName: e.document.name,
+        docType: e.document.type,
+        content: e.document.content,
+      ));
+    }
     await _reload(emit);
   }
 
@@ -877,6 +889,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     Emitter<AppState> emit,
   ) async {
     final db = await DatabaseHelper.instance.database;
+    await DocumentSearchIndexer.deleteDocumentChunks(e.id);
     await db.delete('jarvis_documents', where: 'id=?', whereArgs: [e.id]);
     await _reload(emit);
   }

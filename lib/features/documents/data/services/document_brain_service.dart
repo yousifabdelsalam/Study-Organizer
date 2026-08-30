@@ -10,6 +10,7 @@ import 'package:study_organizer/features/tasks/data/models/task.dart';
 import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/subjects/data/models/subject_metadata.dart';
 import 'package:study_organizer/features/timetable/data/models/timetable.dart';
 import 'package:study_organizer/features/marks/data/models/mark.dart';
@@ -2048,20 +2049,41 @@ FORMATTING:
     sb.writeln();
     final pastExams = docs.where((d) => d.isPastExam).toList();
     final studyDocs = docs.where((d) => !d.isPastExam).toList();
-    sb.writeln('=== PAST EXAMS (${pastExams.length}) ===');
-    for (final e in pastExams) {
-      sb.writeln('--- ${e.name} ---');
-      sb.writeln(
-        e.content.isEmpty ? '[File uploaded, no text extracted]' : e.content,
+    final int? subjectId = docs.isNotEmpty
+        ? docs.first.subjectId
+        : (topics.isNotEmpty ? topics.first.subjectId : null);
+
+    List<DocumentChunkResult> indexedChunks = [];
+    if (subjectId != null) {
+      indexedChunks = await DocumentSearchIndexer.searchRelevantChunks(
+        subjectId: subjectId,
+        query: '$subjectName exam question problem $instructorFocus',
+        limit: 4,
       );
-      sb.writeln();
     }
-    sb.writeln('=== STUDY MATERIALS (${studyDocs.length}) ===');
-    for (final d in studyDocs) {
-      sb.writeln('--- ${d.name} ---');
-      final c = d.content;
-      sb.writeln(c.length > 4000 ? '${c.substring(0, 4000)}...[truncated]' : c);
-      sb.writeln();
+
+    if (indexedChunks.isNotEmpty) {
+      sb.writeln('=== INDEXED EXAM & STUDY SECTIONS (${indexedChunks.length} Key Question Benchmarks) ===');
+      for (final chunk in indexedChunks) {
+        sb.writeln('--- ${chunk.docName} [${chunk.sectionTitle}] ---');
+        sb.writeln(chunk.content);
+        sb.writeln();
+      }
+    } else {
+      sb.writeln('=== PAST EXAMS (${pastExams.length}) ===');
+      for (final e in pastExams) {
+        sb.writeln('--- ${e.name} ---');
+        final c = e.content;
+        sb.writeln(c.length > 1500 ? '${c.substring(0, 1500)}...[summary]' : (c.isEmpty ? '[Uploaded, no text]' : c));
+        sb.writeln();
+      }
+      sb.writeln('=== STUDY MATERIALS (${studyDocs.length}) ===');
+      for (final d in studyDocs) {
+        sb.writeln('--- ${d.name} ---');
+        final c = d.content;
+        sb.writeln(c.length > 1500 ? '${c.substring(0, 1500)}...[summary]' : c);
+        sb.writeln();
+      }
     }
     sb.writeln('=== STUDY TOPICS ===');
     for (final t in topics) {
@@ -2196,21 +2218,42 @@ $ctx
   }) async {
     final pastExams = docs.where((d) => d.isPastExam).toList();
     final studyDocs = docs.where((d) => !d.isPastExam).toList();
+    final int? subjectId = docs.isNotEmpty ? docs.first.subjectId : null;
+
+    List<DocumentChunkResult> indexedChunks = [];
+    if (subjectId != null) {
+      indexedChunks = await DocumentSearchIndexer.searchRelevantChunks(
+        subjectId: subjectId,
+        query: '$examType $subjectName questions problems derivations',
+        limit: 4,
+      );
+    }
+
     final sb = StringBuffer();
     sb.writeln('INSTRUCTOR: Dr. $doctorName');
     if (instructorFocus.isNotEmpty) sb.writeln('STYLE: $instructorFocus');
     sb.writeln();
-    for (final e in pastExams) {
-      sb.writeln('=== PAST EXAM: ${e.name} ===');
-      final c = e.content;
-      sb.writeln(c.length > 3000 ? c.substring(0, 3000) : c);
-      sb.writeln();
-    }
-    for (final d in studyDocs) {
-      sb.writeln('=== MATERIAL: ${d.name} ===');
-      final c = d.content;
-      sb.writeln(c.length > 2000 ? c.substring(0, 2000) : c);
-      sb.writeln();
+
+    if (indexedChunks.isNotEmpty) {
+      sb.writeln('=== KEY QUESTION BLUEPRINTS (FTS5 Index) ===');
+      for (final chunk in indexedChunks) {
+        sb.writeln('--- ${chunk.docType == "past_exam" ? "PAST EXAM" : "MATERIAL"}: ${chunk.docName} [${chunk.sectionTitle}] ---');
+        sb.writeln(chunk.content);
+        sb.writeln();
+      }
+    } else {
+      for (final e in pastExams) {
+        sb.writeln('=== PAST EXAM: ${e.name} ===');
+        final c = e.content;
+        sb.writeln(c.length > 1500 ? c.substring(0, 1500) : c);
+        sb.writeln();
+      }
+      for (final d in studyDocs) {
+        sb.writeln('=== MATERIAL: ${d.name} ===');
+        final c = d.content;
+        sb.writeln(c.length > 1200 ? c.substring(0, 1200) : c);
+        sb.writeln();
+      }
     }
     final data = sb.toString();
     final ar = language == 'arabic';

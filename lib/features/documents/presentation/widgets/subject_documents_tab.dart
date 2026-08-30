@@ -15,6 +15,7 @@ import 'package:study_organizer/core/widgets/glass.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
 import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/exams/presentation/pages/exam_prep_hud_page.dart';
 import 'package:study_organizer/features/exams/presentation/widgets/post_exam_analyzer.dart';
 import 'package:study_organizer/features/nova_intelligence/data/services/nova_intelligence_engine.dart';
@@ -368,20 +369,24 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
       final fileUri = uploaded['uri']!;
       final fileMime = uploaded['mimeType']!;
 
-      // Step 2: Extract text using the URI (for NOVA chat context / search)
-      // Note: even if text extraction returns 0 chars, the file URI is still valid
-      // and "Break Doctor Brain" will work using the URI directly.
-      setState(() => _uploadStatus = 'Extracting text for search...');
-      final extracted = await JarvisBrainService.extractTextFromFileUri(
-        fileUri: fileUri,
-        mimeType: fileMime,
-      );
+      // Step 2: Extract text using on-device PDF engine if PDF, otherwise Gemini Files API
+      String extracted = '';
+      if (ext == 'pdf') {
+        setState(() => _uploadStatus = 'Extracting PDF text on-device...');
+        extracted = DocumentSearchIndexer.extractTextFromPdfBytes(bytes);
+      }
+      if (extracted.isEmpty) {
+        setState(() => _uploadStatus = 'Extracting text for search...');
+        extracted = await JarvisBrainService.extractTextFromFileUri(
+          fileUri: fileUri,
+          mimeType: fileMime,
+        );
+      }
 
       setState(() => _uploadingFile = false);
       if (!mounted) return;
 
       // Show confirmation sheet. File URI is always valid even if text = empty.
-      // User can still run "Break Doctor Brain NOW" which uses the URI directly.
       _showAddDocSheet(
         name,
         extracted,

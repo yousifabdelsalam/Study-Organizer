@@ -39,9 +39,6 @@ class MidnightScheduler {
       // Load subjects for name map
       final subjectRows = await db.database
           .then((d) => d.query('subjects'));
-      // Load tasks
-      final taskRows = await db.database
-          .then((d) => d.query('tasks'));
 
       // Build subject name map
       final subjectNames = <int, String>{};
@@ -77,6 +74,12 @@ class MidnightScheduler {
         subjectNames: subjectNames,
         currentWeekType: weekType,
         tasks: [], // tasks handled separately — not critical for midnight run
+      );
+
+      // Schedule day summary notification (10 min after last class)
+      await NotifService.scheduleReadMyDayNotif(
+        allEntries: entries.map((e) => e.toTimetableEntry()).toList(),
+        currentWeekType: weekType,
       );
 
       debugPrint('✅ [WorkManager] Midnight reschedule complete');

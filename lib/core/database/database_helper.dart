@@ -27,11 +27,37 @@ class DatabaseHelper {
     final path = await dbPath;
     return openDatabase(
       path,
-      version: 16,
+      version: 17,
       onCreate: (db, v) async {
         await _createTables(db);
       },
       onUpgrade: (db, oldV, newV) async {
+        if (oldV < 17) {
+          try {
+            await db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+              docId UNINDEXED,
+              subjectId UNINDEXED,
+              chunkIndex UNINDEXED,
+              docName,
+              docType,
+              sectionTitle,
+              content,
+              tokenize = 'unicode61'
+            )''');
+          } catch (_) {}
+          try {
+            await db.execute('''CREATE TABLE IF NOT EXISTS document_chunks_fallback(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              docId INTEGER NOT NULL,
+              subjectId INTEGER NOT NULL,
+              chunkIndex INTEGER NOT NULL,
+              docName TEXT NOT NULL,
+              docType TEXT NOT NULL,
+              sectionTitle TEXT DEFAULT '',
+              content TEXT NOT NULL
+            )''');
+          } catch (_) {}
+        }
         if (oldV < 16) {
           try {
             await db.execute(
@@ -394,6 +420,32 @@ class DatabaseHelper {
       notes TEXT,
       FOREIGN KEY(subjectId) REFERENCES subjects(id) ON DELETE SET NULL
     )''');
+
+    // ── FTS5 Document Chunk Index Tables ──────────────────────────────────────
+    try {
+      await db.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
+        docId UNINDEXED,
+        subjectId UNINDEXED,
+        chunkIndex UNINDEXED,
+        docName,
+        docType,
+        sectionTitle,
+        content,
+        tokenize = 'unicode61'
+      )''');
+    } catch (_) {}
+    try {
+      await db.execute('''CREATE TABLE IF NOT EXISTS document_chunks_fallback(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docId INTEGER NOT NULL,
+        subjectId INTEGER NOT NULL,
+        chunkIndex INTEGER NOT NULL,
+        docName TEXT NOT NULL,
+        docType TEXT NOT NULL,
+        sectionTitle TEXT DEFAULT '',
+        content TEXT NOT NULL
+      )''');
+    } catch (_) {}
   }
 
   // ── Pomodoro Session CRUD ─────────────────────────────────────────────────

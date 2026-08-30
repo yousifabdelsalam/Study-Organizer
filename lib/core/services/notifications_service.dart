@@ -1700,7 +1700,7 @@ class NotifService {
     }
     if (lastEnd == null) return;
 
-    final notifyAt = lastEnd.add(const Duration(minutes: 5));
+    final notifyAt = lastEnd.add(const Duration(minutes: 10));
     if (notifyAt.isBefore(now)) return;
 
     await schedule(
