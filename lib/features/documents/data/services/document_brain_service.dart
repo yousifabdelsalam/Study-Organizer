@@ -10,6 +10,7 @@ import 'package:study_organizer/features/tasks/data/models/task.dart';
 import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/subjects/data/models/subject_metadata.dart';
 import 'package:study_organizer/features/timetable/data/models/timetable.dart';
 import 'package:study_organizer/features/marks/data/models/mark.dart';
@@ -138,11 +139,11 @@ class JarvisBrainService {
     return list;
   }
 
-  // Cache of all available model IDs for this API key
-  static List<String>? _allAvailableModels;
+  // Cache of available model IDs per API key
+  static final Map<String, List<String>> _keyModelsCache = {};
 
   static Future<List<String>> _listAvailableModels(String apiKey) async {
-    if (_allAvailableModels != null) return _allAvailableModels!;
+    if (_keyModelsCache.containsKey(apiKey)) return _keyModelsCache[apiKey]!;
     try {
       final url =
           'https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey&pageSize=50';
@@ -172,7 +173,9 @@ class JarvisBrainService {
       debugPrint(
         'Available models (${sorted.length}): ${sorted.take(8).join(', ')}',
       );
-      _allAvailableModels = sorted;
+      if (sorted.isNotEmpty) {
+        _keyModelsCache[apiKey] = sorted;
+      }
       return sorted;
     } catch (e) {
       debugPrint('JarvisBrain listModels error: $e');
@@ -183,23 +186,21 @@ class JarvisBrainService {
   // Clear model cache (call when API key changes)
   static void clearModelCache() {
     _cachedModelId = null;
-    _allAvailableModels = null;
+    _keyModelsCache.clear();
   }
 
   static Future<String> _generateContent(String prompt, {List<JarvisDocument>? attachedDocs}) async {
     await _loadKeyPool();
+
     if (_keyPool.isEmpty) {
-      throw Exception('NO_KEY: Please set your Gemini API key in NOVA settings. Get a free key at aistudio.google.com');
+      throw Exception('NO_KEY:No API key configured. Please set your Gemini API key in NOVA settings.');
     }
 
     const fallbackIds = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-3.0-flash',
-      'gemini-3.0-pro',
-      'gemini-2.0-flash-exp',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash-exp',
     ];
 
     String? lastError;
@@ -207,14 +208,13 @@ class JarvisBrainService {
     for (final apiKey in _keyPool) {
       if (apiKey.trim().isEmpty) continue;
       final fromApi = await _listAvailableModels(apiKey);
-      List<String> toTry;
-      if (_cachedModelId != null && fromApi.contains(_cachedModelId!)) {
-        toTry = [_cachedModelId!, ...fromApi.where((m) => m != _cachedModelId!)];
-      } else {
-        toTry = fromApi.isNotEmpty ? fromApi : _sortModelsSmartestFirst(fallbackIds);
-      }
+      final List<String> toTry = [
+        if (_cachedModelId != null && fromApi.contains(_cachedModelId!)) _cachedModelId!,
+        ...fromApi.where((m) => m != _cachedModelId),
+        ...fallbackIds.where((m) => !fromApi.contains(m)),
+      ];
 
-      for (final modelId in toTry) {
+      for (final modelId in toTry.take(6)) {
         for (final version in ['v1beta', 'v1']) {
           final url =
               'https://generativelanguage.googleapis.com/$version/models/$modelId:generateContent?key=$apiKey';
@@ -227,14 +227,6 @@ class JarvisBrainService {
                     'contents': [
                       {
                         'parts': [
-                          if (attachedDocs != null)
-                            for (final d in attachedDocs.where((d) => d.fileUri != null && d.fileMime != null))
-                              {
-                                'fileData': {
-                                  'mimeType': d.fileMime,
-                                  'fileUri': d.fileUri,
-                                }
-                              },
                           {'text': prompt},
                         ],
                       },
@@ -270,13 +262,13 @@ class JarvisBrainService {
                 res.body.contains('quota')) {
               _cachedModelId = null;
               lastError =
-                  'Quota exceeded on API key. Trying next key...';
-              break;
+                  'Quota exceeded on your Gemini API key. Please wait a few minutes or add a backup key in settings.';
+              break; // Try next API key
             }
             if (res.statusCode == 403 || res.statusCode == 401) {
               lastError =
-                  'Invalid or restricted API key. Trying next key...';
-              break;
+                  'Invalid or restricted Gemini API key. Please check your API key in NOVA settings.';
+              break; // Try next API key
             }
             lastError = res.body.length > 200
                 ? '${res.body.substring(0, 200)}...'
@@ -290,7 +282,7 @@ class JarvisBrainService {
 
     throw Exception(
       lastError ??
-          'No Gemini model worked. Check your API key and connection.',
+          'No Gemini model could respond. Please check your API key and internet connection in NOVA settings.',
     );
   }
 
@@ -1837,13 +1829,16 @@ REASONING:
     } catch (e) {
       debugPrint('JarvisBrain chat error: $e');
       final msg = e.toString().replaceFirst('Exception: ', '');
-      if (msg.startsWith('NO_KEY:')) {
+      if (msg.startsWith('NO_KEY:') || msg.contains('No API key')) {
         return 'Please set your Gemini API key in NOVA settings. Get a free key at aistudio.google.com';
       }
       if (msg.contains('Quota exceeded') || msg.contains('quota')) {
         return 'Quota exceeded on your Gemini API key(s). Please try again in a few minutes or add another key in settings.';
       }
-      return 'AI Generation Error: $msg';
+      if (msg.contains('Invalid or restricted') || msg.contains('restricted API key')) {
+        return 'Your Gemini API key appears to be invalid or restricted. Please check your key in NOVA settings.';
+      }
+      return '⚠️ $msg';
     }
   }
 
@@ -2054,20 +2049,41 @@ FORMATTING:
     sb.writeln();
     final pastExams = docs.where((d) => d.isPastExam).toList();
     final studyDocs = docs.where((d) => !d.isPastExam).toList();
-    sb.writeln('=== PAST EXAMS (${pastExams.length}) ===');
-    for (final e in pastExams) {
-      sb.writeln('--- ${e.name} ---');
-      sb.writeln(
-        e.content.isEmpty ? '[File uploaded, no text extracted]' : e.content,
+    final int? subjectId = docs.isNotEmpty
+        ? docs.first.subjectId
+        : (topics.isNotEmpty ? topics.first.subjectId : null);
+
+    List<DocumentChunkResult> indexedChunks = [];
+    if (subjectId != null) {
+      indexedChunks = await DocumentSearchIndexer.searchRelevantChunks(
+        subjectId: subjectId,
+        query: '$subjectName exam question problem $instructorFocus',
+        limit: 4,
       );
-      sb.writeln();
     }
-    sb.writeln('=== STUDY MATERIALS (${studyDocs.length}) ===');
-    for (final d in studyDocs) {
-      sb.writeln('--- ${d.name} ---');
-      final c = d.content;
-      sb.writeln(c.length > 4000 ? '${c.substring(0, 4000)}...[truncated]' : c);
-      sb.writeln();
+
+    if (indexedChunks.isNotEmpty) {
+      sb.writeln('=== INDEXED EXAM & STUDY SECTIONS (${indexedChunks.length} Key Question Benchmarks) ===');
+      for (final chunk in indexedChunks) {
+        sb.writeln('--- ${chunk.docName} [${chunk.sectionTitle}] ---');
+        sb.writeln(chunk.content);
+        sb.writeln();
+      }
+    } else {
+      sb.writeln('=== PAST EXAMS (${pastExams.length}) ===');
+      for (final e in pastExams) {
+        sb.writeln('--- ${e.name} ---');
+        final c = e.content;
+        sb.writeln(c.length > 1500 ? '${c.substring(0, 1500)}...[summary]' : (c.isEmpty ? '[Uploaded, no text]' : c));
+        sb.writeln();
+      }
+      sb.writeln('=== STUDY MATERIALS (${studyDocs.length}) ===');
+      for (final d in studyDocs) {
+        sb.writeln('--- ${d.name} ---');
+        final c = d.content;
+        sb.writeln(c.length > 1500 ? '${c.substring(0, 1500)}...[summary]' : c);
+        sb.writeln();
+      }
     }
     sb.writeln('=== STUDY TOPICS ===');
     for (final t in topics) {
@@ -2202,21 +2218,42 @@ $ctx
   }) async {
     final pastExams = docs.where((d) => d.isPastExam).toList();
     final studyDocs = docs.where((d) => !d.isPastExam).toList();
+    final int? subjectId = docs.isNotEmpty ? docs.first.subjectId : null;
+
+    List<DocumentChunkResult> indexedChunks = [];
+    if (subjectId != null) {
+      indexedChunks = await DocumentSearchIndexer.searchRelevantChunks(
+        subjectId: subjectId,
+        query: '$examType $subjectName questions problems derivations',
+        limit: 4,
+      );
+    }
+
     final sb = StringBuffer();
     sb.writeln('INSTRUCTOR: Dr. $doctorName');
     if (instructorFocus.isNotEmpty) sb.writeln('STYLE: $instructorFocus');
     sb.writeln();
-    for (final e in pastExams) {
-      sb.writeln('=== PAST EXAM: ${e.name} ===');
-      final c = e.content;
-      sb.writeln(c.length > 3000 ? c.substring(0, 3000) : c);
-      sb.writeln();
-    }
-    for (final d in studyDocs) {
-      sb.writeln('=== MATERIAL: ${d.name} ===');
-      final c = d.content;
-      sb.writeln(c.length > 2000 ? c.substring(0, 2000) : c);
-      sb.writeln();
+
+    if (indexedChunks.isNotEmpty) {
+      sb.writeln('=== KEY QUESTION BLUEPRINTS (FTS5 Index) ===');
+      for (final chunk in indexedChunks) {
+        sb.writeln('--- ${chunk.docType == "past_exam" ? "PAST EXAM" : "MATERIAL"}: ${chunk.docName} [${chunk.sectionTitle}] ---');
+        sb.writeln(chunk.content);
+        sb.writeln();
+      }
+    } else {
+      for (final e in pastExams) {
+        sb.writeln('=== PAST EXAM: ${e.name} ===');
+        final c = e.content;
+        sb.writeln(c.length > 1500 ? c.substring(0, 1500) : c);
+        sb.writeln();
+      }
+      for (final d in studyDocs) {
+        sb.writeln('=== MATERIAL: ${d.name} ===');
+        final c = d.content;
+        sb.writeln(c.length > 1200 ? c.substring(0, 1200) : c);
+        sb.writeln();
+      }
     }
     final data = sb.toString();
     final ar = language == 'arabic';

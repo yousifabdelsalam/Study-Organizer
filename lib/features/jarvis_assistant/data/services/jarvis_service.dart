@@ -16,6 +16,7 @@ import 'package:study_organizer/features/topics/data/models/topic.dart';
 import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
 import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/speech_engine/data/services/audio_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -532,6 +533,29 @@ class JarvisService {
     String personalityMode = 'normal',
   }) async {
     try {
+      // Find subject related to query or context
+      int? targetSubjectId;
+      for (final s in subjects) {
+        if (s.id != null &&
+            (text.toLowerCase().contains(s.name.toLowerCase()) ||
+                (brainContext != null && brainContext.contains(s.name)))) {
+          targetSubjectId = s.id;
+          break;
+        }
+      }
+      if (targetSubjectId == null && subjects.isNotEmpty) {
+        targetSubjectId = subjects.first.id;
+      }
+
+      List<DocumentChunkResult> relevantDocChunks = [];
+      if (targetSubjectId != null) {
+        relevantDocChunks = await DocumentSearchIndexer.searchRelevantChunks(
+          subjectId: targetSubjectId,
+          query: text,
+          limit: 3,
+        );
+      }
+
       final prompt = _buildUnifiedPrompt(
         DateTime.now(),
         subjects,
@@ -543,6 +567,7 @@ class JarvisService {
         notes,
         documents,
         text,
+        relevantDocChunks: relevantDocChunks,
         brainContext: brainContext,
         brainHistory: brainHistory,
         personalityMode: personalityMode,
@@ -679,6 +704,7 @@ class JarvisService {
     List<SubjectNote> notes,
     List<JarvisDocument> documents,
     String userText, {
+    List<DocumentChunkResult>? relevantDocChunks,
     String? brainContext,
     List<Map<String, String>>? brainHistory,
     String personalityMode = 'normal',
@@ -793,7 +819,7 @@ YESTERDAY SCHEDULE: ${yesterdayClasses.isEmpty ? 'None' : yesterdayClasses.map((
             return '${e.startTime}-${e.endTime} $sn ${e.type}';
           }).join(', ')}
 MARKS: $marksSummary
-
+${(relevantDocChunks != null && relevantDocChunks.isNotEmpty) ? '\nRELEVANT EXAM & COURSE MATERIAL EXCERPTS (FTS5 Search Index):\n${relevantDocChunks.map((c) => '• [${c.docName} - ${c.sectionTitle}]: ${c.content}').join('\n')}\n' : ''}
 ${histBuf.isNotEmpty ? 'CONVERSATION HISTORY:\n$histBuf' : ''}
 USER: "$userText"
 

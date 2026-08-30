@@ -15,6 +15,7 @@ import 'package:study_organizer/core/widgets/glass.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/documents/data/models/study_document.dart';
 import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
+import 'package:study_organizer/features/documents/data/services/document_search_indexer.dart';
 import 'package:study_organizer/features/exams/presentation/pages/exam_prep_hud_page.dart';
 import 'package:study_organizer/features/exams/presentation/widgets/post_exam_analyzer.dart';
 import 'package:study_organizer/features/nova_intelligence/data/services/nova_intelligence_engine.dart';
@@ -162,7 +163,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                             ),
                           )
                         : Text(
-                            _intelCard == null ? 'âš¡ Generate' : 'ðŸ”„ Regen',
+                            _intelCard == null ? '⚡ Generate' : '🔄 Regen',
                             style: const TextStyle(
                               color: Color(0xFF39FF14),
                               fontSize: 9.5,
@@ -368,20 +369,24 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
       final fileUri = uploaded['uri']!;
       final fileMime = uploaded['mimeType']!;
 
-      // Step 2: Extract text using the URI (for NOVA chat context / search)
-      // Note: even if text extraction returns 0 chars, the file URI is still valid
-      // and "Break Doctor Brain" will work using the URI directly.
-      setState(() => _uploadStatus = 'Extracting text for search...');
-      final extracted = await JarvisBrainService.extractTextFromFileUri(
-        fileUri: fileUri,
-        mimeType: fileMime,
-      );
+      // Step 2: Extract text using on-device PDF engine if PDF, otherwise Gemini Files API
+      String extracted = '';
+      if (ext == 'pdf') {
+        setState(() => _uploadStatus = 'Extracting PDF text on-device...');
+        extracted = DocumentSearchIndexer.extractTextFromPdfBytes(bytes);
+      }
+      if (extracted.isEmpty) {
+        setState(() => _uploadStatus = 'Extracting text for search...');
+        extracted = await JarvisBrainService.extractTextFromFileUri(
+          fileUri: fileUri,
+          mimeType: fileMime,
+        );
+      }
 
       setState(() => _uploadingFile = false);
       if (!mounted) return;
 
       // Show confirmation sheet. File URI is always valid even if text = empty.
-      // User can still run "Break Doctor Brain NOW" which uses the URI directly.
       _showAddDocSheet(
         name,
         extracted,
@@ -473,7 +478,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    fileUri != null ? 'Uploaded âœ“' : 'Ready',
+                    fileUri != null ? 'Uploaded ✓' : 'Ready',
                     style: const TextStyle(fontSize: 12, color: Colors.green),
                   ),
                   const SizedBox(width: 8),
@@ -512,7 +517,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                   decoration: InputDecoration(
                     labelText: charCount > 0
                         ? 'Extracted text ($charCount chars, editable)'
-                        : 'Could not extract text â€” Run "Break Doctor Brain" below for full AI analysis',
+                        : 'Could not extract text — Run "Break Doctor Brain" below for full AI analysis',
                     alignLabelWithHint: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -567,7 +572,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                 const SizedBox(height: 10),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.psychology_alt_rounded),
-                  label: const Text('ðŸ”¬ Break Doctor Brain NOW'),
+                  label: const Text('🔬 Break Doctor Brain NOW'),
                   onPressed: () {
                     final docName = nameController.text.trim().isEmpty
                         ? defaultName
@@ -607,7 +612,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                 const SizedBox(height: 4),
                 const Center(
                   child: Text(
-                    'Analyze now â€” crack the exam pattern instantly',
+                    'Analyze now — crack the exam pattern instantly',
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ),
@@ -911,7 +916,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
 
         const SizedBox(height: 24),
 
-        // â”€â”€ EXAM PREPARATION BUTTON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── EXAM PREPARATION BUTTON ──────────────────────────────────────────
         Container(
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 20),
@@ -935,16 +940,20 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: _runExamPrep,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
+              child: const Padding(
+                padding: EdgeInsets.symmetric(
                   vertical: 18,
                   horizontal: 20,
                 ),
                 child: Row(
                   children: [
-                    const Text('ðŸ§ ', style: TextStyle(fontSize: 28)),
-                    const SizedBox(width: 14),
-                    const Expanded(
+                    Icon(
+                      Icons.psychology_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -968,7 +977,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                         ],
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward_ios_rounded,
                       color: Colors.white70,
                       size: 16,
@@ -982,7 +991,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
 
         const SizedBox(height: 10),
 
-        // â”€â”€ POST-EXAM REVIEW BUTTON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── POST-EXAM REVIEW BUTTON ───────────────────────────────────────────
         Container(
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 8),
@@ -1007,7 +1016,11 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                 ),
                 child: Row(
                   children: [
-                    const Text('ðŸ“', style: TextStyle(fontSize: 26)),
+                    Icon(
+                      Icons.analytics_rounded,
+                      color: subjectColor,
+                      size: 28,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -1024,7 +1037,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            'Upload exam â†’ NOVA reviews each question â†’ saves mistakes to all future plans',
+                            'Upload exam → NOVA reviews each question → saves mistakes to all future plans',
                             style: TextStyle(
                               color: Colors.white54,
                               fontSize: 11,
@@ -1047,7 +1060,7 @@ class _SubjectDocumentsTabState extends State<SubjectDocumentsTab> {
 
         const SizedBox(height: 8),
 
-        // â”€â”€ NOVA Subject Intel Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── NOVA Subject Intel Card ──────────────────────────────────────────
         _intelCardSection(),
 
         const SizedBox(height: 8),

@@ -15,8 +15,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import 'dart:typed_data';
 import 'package:study_organizer/core/bloc/app_bloc.dart';
 import 'package:study_organizer/core/bloc/app_event.dart';
+import 'package:study_organizer/core/services/isolate_image_pipeline.dart';
 import 'package:study_organizer/features/subjects/data/models/subject.dart';
 import 'package:study_organizer/features/notes/data/models/subject_note.dart';
 import 'package:study_organizer/features/documents/data/services/document_brain_service.dart';
@@ -119,11 +121,23 @@ class _PostExamAnalyzerSheetState extends State<_PostExamAnalyzerSheet> {
         ? 'image/png'
         : 'image/jpeg';
 
+    Uint8List uploadBytes = bytes;
+    String uploadMime = mime;
+
+    if (mime.startsWith('image/')) {
+      if (mounted) setState(() { _uploading = true; _uploadStatus = 'Compressing image in background isolate…'; _examName = file.name; });
+      try {
+        final processed = await IsolateImagePipeline.processBytes(bytes, maxDimension: 1024, quality: 80);
+        uploadBytes = processed.compressedBytes;
+        uploadMime = processed.mimeType;
+      } catch (_) {}
+    }
+
     if (mounted) setState(() { _uploading = true; _uploadStatus = 'Uploading to NOVA vision…'; _examName = file.name; });
 
     final result = await JarvisBrainService.uploadFileToGemini(
-      bytes: bytes,
-      mimeType: mime,
+      bytes: uploadBytes,
+      mimeType: uploadMime,
       displayName: file.name,
       onStatus: (s) { if (mounted) setState(() => _uploadStatus = s); },
     );

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:study_organizer/core/services/notifications_service.dart';
 import 'package:study_organizer/core/database/database_helper.dart';
@@ -21,11 +22,15 @@ class ClassAlarmHandler extends TaskHandler {
     await NotifService.checkAndFireMissed();
   }
 
-  // Fires every 1 minute — this IS the clock, no Timers needed
+  // Fires every 15 seconds — this IS the clock, no Timers needed
   @override
   void onRepeatEvent(DateTime timestamp) {
     _checkAndFire();
-    NotifService.checkAndFireMissed();
+    // Run the heavier fallback check every ~60s (every 4th tick)
+    _tickCount++;
+    if (_tickCount % 4 == 0) {
+      NotifService.checkAndFireMissed();
+    }
   }
 
   @override
@@ -33,22 +38,27 @@ class ClassAlarmHandler extends TaskHandler {
     debugPrint('[ClassAlarm] Destroyed (isTimeout: $isTimeout)');
   }
 
-  // ── Core logic: runs every 60 seconds ─────────────────────────────────────
+  // ── Core logic: runs every 15 seconds ─────────────────────────────────────
+  static int _tickCount = 0;
+
   Future<void> _checkAndFire() async {
     final now = DateTime.now();
     final classes = await _getTodayClasses(now);
 
-    if (classes.isEmpty) return;
-
+    // Fire class notifications
     for (final c in classes) {
       final secondsUntil = c.startTime.difference(now).inSeconds;
 
-      // Fire if class starts within next 60 seconds (heartbeat window)
-      // or started within the last 30 seconds (late wakeup tolerance)
-      if (secondsUntil >= -30 && secondsUntil <= 60) {
+      // Fire if class starts within next 20 seconds (just over 1 heartbeat)
+      // or started within the last 5 minutes (Doze-proof safety net).
+      // The duplicate guard (_firedToday) prevents double notifications,
+      // so the wide late window costs nothing — it only catches misses.
+      if (secondsUntil >= -300 && secondsUntil <= 20) {
         final key = '${now.year}-${now.month}-${now.day}-${c.notifId}';
         if (_firedToday.contains(key)) continue; // STRICT DUPLICATE GUARD
         _firedToday.add(key);
+
+        final lateSeconds = -secondsUntil; // positive = how late we are
 
         debugPrint(
           '[ClassAlarm] FIRING show() for "${c.title}" '
@@ -60,18 +70,98 @@ class ClassAlarmHandler extends TaskHandler {
         // Uses the timetable scheduled ID range (110,000+).
         NotifService.cancelSingle(c.nativeScheduledId);
         
+        // Build body — add late indicator if more than 60s late
+        final body = lateSeconds > 60
+            ? '⏰ ${(lateSeconds / 60).ceil()}m late — ${c.body}'
+            : c.body;
+        
         // FIX: Use foreground ID range (200,000+) — guaranteed no collision
         // with the scheduled alarm IDs (110,000+).
         await NotifService.show(
           id: c.notifId,
           title: c.title,
-          body: c.body,
+          body: body,
           channelId: 'timetable_notifs',
           channelName: 'Class Reminders',
           channelDesc: 'Timetable',
           payload: c.payload,
         );
       }
+    }
+
+    // Day summary notification — runs independently of class firing
+    await _checkAndFireDaySummary(now);
+  }
+
+  // ── Day Summary: fires 10 minutes after the last class of the day ────────
+  Future<void> _checkAndFireDaySummary(DateTime now) async {
+    // Find the last class end time from the DB (need endTime, not startTime)
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final rows = await db.query('timetable');
+
+      final doy = int.parse(intl.DateFormat('D').format(now));
+      final weekNum = ((doy - now.weekday + 10) / 7).floor();
+      final weekType = weekNum.isOdd ? 'odd' : 'even';
+
+      DateTime? lastEnd;
+      for (final row in rows) {
+        final dayOfWeek = (row['dayOfWeek'] as int?) ?? 0;
+        final endTime = (row['endTime'] as String?) ?? '';
+        final wType = (row['weekType'] as String?) ?? 'both';
+
+        if (dayOfWeek != now.weekday) continue;
+        if (wType != 'both' && wType != weekType) continue;
+
+        final parts = endTime.split(':');
+        if (parts.length < 2) continue;
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        final dt = DateTime(now.year, now.month, now.day, h, m);
+        if (lastEnd == null || dt.isAfter(lastEnd)) lastEnd = dt;
+      }
+
+      if (lastEnd == null) return;
+
+      // Fire 10 minutes after the last class ends
+      final summaryTime = lastEnd.add(const Duration(minutes: 10));
+      final secondsUntil = summaryTime.difference(now).inSeconds;
+
+      // Same pattern as class notifications: fire within [-300s, +20s] window
+      if (secondsUntil >= -300 && secondsUntil <= 20) {
+        final key = '${now.year}-${now.month}-${now.day}-day_summary';
+        if (_firedToday.contains(key)) return;
+        _firedToday.add(key);
+
+        debugPrint('[ClassAlarm] FIRING day summary notification');
+
+        // Cancel the scheduled alarm to prevent doubles
+        NotifService.cancelSingle(170000); // _IdRange.readMyDay
+
+        await NotifService.show(
+          id: 170000, // _IdRange.readMyDay
+          title: '🎓 Day complete! Hear your summary?',
+          body: 'Tap to listen to your daily briefing',
+          channelId: 'read_my_day',
+          channelName: 'Read My Day',
+          channelDesc: 'End-of-day review',
+          payload: 'read_my_day:choose',
+          actions: [
+            const AndroidNotificationAction(
+              'read_en', '🔊 English',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            const AndroidNotificationAction(
+              'read_ar', '🔊 عربي',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+          ],
+        );
+      }
+    } catch (e) {
+      debugPrint('[ClassAlarm] Day summary check failed: $e');
     }
   }
 
@@ -185,8 +275,10 @@ class ClassAlarmService {
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        // 60000ms = 1 minute — this is the clock tick
-        eventAction: ForegroundTaskEventAction.repeat(60000),
+        // 15000ms = 15 seconds — tight heartbeat for accurate class alerts.
+        // The foreground service is the PRIMARY delivery mechanism; Android's
+        // zonedSchedule is the backup. 15s ticks guarantee ≤15s delivery jitter.
+        eventAction: ForegroundTaskEventAction.repeat(15000),
         autoRunOnBoot: true,
         autoRunOnMyPackageReplaced: true,
         allowWakeLock: true,
